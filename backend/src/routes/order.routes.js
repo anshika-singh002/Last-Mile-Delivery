@@ -10,6 +10,7 @@ router.post('/preview-charge', orderController.previewCharge);
 router.get('/', orderController.getAllOrders);
 router.post('/', validateOrderCreation, orderController.createOrder);
 router.get('/:id', orderController.getOrderDetails);
+router.get('/:id/timeline', orderController.getOrderTimeline);
 router.patch('/:id/status', orderController.updateStatus);
 router.post('/:id/assign', orderController.assignAgent);
 router.post('/:id/auto-assign', orderController.autoAssign);

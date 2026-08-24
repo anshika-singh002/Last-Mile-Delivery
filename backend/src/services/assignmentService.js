@@ -1,6 +1,7 @@
 const { memoryDb } = require('../config/database');
 const { USER_ROLES, ORDER_STATUS } = require('../config/constants');
 const { calculateHaversineDistance } = require('../utils/haversine');
+const TrackingHistory = require('../models/TrackingHistory');
 
 const ACTIVE_ORDER_STATUSES = [
   ORDER_STATUS.ASSIGNED,
@@ -157,17 +158,21 @@ class AssignmentService {
         order.status = ORDER_STATUS.ASSIGNED;
         order.updatedAt = new Date().toISOString();
 
-        const historyItem = {
-          id: `th-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        TrackingHistory.append({
           orderId: order.id,
           status: ORDER_STATUS.ASSIGNED,
+          previousStatus: ORDER_STATUS.CREATED,
           actor: 'SYSTEM',
           actorId: 'system',
+          actorName: 'Auto-Assignment Dispatcher',
           notes: `Auto-assigned from queue: ${assignment.reason}`,
           location: assignment.agent.currentLocation || null,
-          timestamp: new Date().toISOString()
-        };
-        memoryDb.trackingHistories.push(historyItem);
+          metadata: {
+            agentId: assignment.agent.id,
+            distanceKm: assignment.distanceKm,
+            isZoneMatch: assignment.isZoneMatch
+          }
+        });
         assignedResults.push({ orderId: order.id, agent: assignment.agent });
       }
     }

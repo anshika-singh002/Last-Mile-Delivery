@@ -127,24 +127,54 @@ export default function OrderTracking({ orderId, onBack }) {
 
         {/* Timeline */}
         <div className="space-y-4 pt-2">
-          <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center space-x-2">
-            <Clock className="w-4 h-4 text-sky-400" />
-            <span>Immutable Tracking Timeline</span>
-          </h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center space-x-2">
+              <Clock className="w-4 h-4 text-sky-400" />
+              <span>Immutable Lifecycle Audit Ledger</span>
+            </h3>
+            <span className="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full flex items-center space-x-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span>SHA-256 Verified Ledger</span>
+            </span>
+          </div>
 
           <div className="space-y-3 relative before:absolute before:left-3.5 before:top-3 before:bottom-3 before:w-0.5 before:bg-slate-800">
-            {order.trackingHistory?.map((item, idx) => (
+            {order.trackingHistory?.map((item) => (
               <div key={item.id} className="flex items-start space-x-4 relative z-10">
-                <div className="w-7 h-7 rounded-full bg-slate-950 border border-sky-500 flex items-center justify-center shrink-0">
+                <div className="w-7 h-7 rounded-full bg-slate-950 border border-sky-500 flex items-center justify-center shrink-0 shadow-md shadow-sky-500/20">
                   <CheckCircle className="w-4 h-4 text-sky-400" />
                 </div>
-                <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex-1">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-white text-xs">{item.status}</span>
-                    <span className="text-[10px] text-slate-500">{new Date(item.timestamp).toLocaleTimeString()}</span>
+                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 flex-1 space-y-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                    <div className="flex items-center space-x-2">
+                      <span className="font-bold text-white text-xs">{item.status}</span>
+                      {item.previousStatus && (
+                        <span className="text-[10px] text-slate-500">
+                          (from {item.previousStatus})
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      {new Date(item.timestamp).toLocaleString()}
+                    </span>
                   </div>
-                  <p className="text-slate-400 text-xs mt-1">{item.notes}</p>
-                  <span className="text-[10px] text-slate-500 block mt-1">Actor: {item.actor}</span>
+
+                  <p className="text-slate-300 text-xs">{item.notes}</p>
+
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-900 text-[10px] text-slate-500">
+                    <div className="flex items-center space-x-1.5">
+                      <span className="text-slate-400 font-semibold">Actor:</span>
+                      <span className="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-300 font-medium">
+                        {item.actorName ? `${item.actorName} (${item.actor})` : item.actor}
+                      </span>
+                    </div>
+
+                    {item.eventHash && (
+                      <span className="font-mono text-[9px] text-slate-600 truncate max-w-[200px]" title={`Cryptographic Event Checksum: ${item.eventHash}`}>
+                        Hash: {item.eventHash.slice(0, 12)}...
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}

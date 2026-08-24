@@ -36,6 +36,30 @@ exports.getOrderDetails = async (req, res, next) => {
   }
 };
 
+exports.getOrderTimeline = async (req, res, next) => {
+  try {
+    const TrackingHistory = require('../models/TrackingHistory');
+    const order = await orderService.getOrderById(req.params.id);
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+    const timeline = TrackingHistory.getByOrderId(req.params.id);
+    const isValid = TrackingHistory.verifyIntegrity(req.params.id);
+    res.json({
+      success: true,
+      data: {
+        orderId: req.params.id,
+        currentStatus: order.status,
+        isLedgerVerified: isValid,
+        totalEvents: timeline.length,
+        events: timeline
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 exports.getAllOrders = async (req, res, next) => {
   try {
     const filters = {};

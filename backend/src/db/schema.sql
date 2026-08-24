@@ -84,29 +84,38 @@ CREATE TABLE IF NOT EXISTS orders (
   FOREIGN KEY (assigned_agent_id) REFERENCES users(id)
 );
 
+-- Immutable tracking event ledger for complete delivery lifecycle auditing
+CREATE TABLE IF NOT EXISTS tracking_histories (
+  id VARCHAR(80) PRIMARY KEY,
+  order_id VARCHAR(50) NOT NULL,
+  status VARCHAR(50) NOT NULL,
+  previous_status VARCHAR(50),
+  actor VARCHAR(50) NOT NULL,       -- CUSTOMER, AGENT, ADMIN, SYSTEM
+  actor_id VARCHAR(50) NOT NULL,
+  actor_name VARCHAR(100),
+  notes TEXT,
+  reason VARCHAR(100),
+  location JSON,                    -- { lat: number, lng: number, address: string }
+  metadata JSON,                    -- additional event metadata
+  event_hash VARCHAR(64),           -- cryptographic hash verification
+  timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  INDEX idx_tracking_order_id (order_id),
+  INDEX idx_tracking_timestamp (timestamp),
+  INDEX idx_tracking_actor (actor_id),
+  FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
+  FOREIGN KEY (actor_id) REFERENCES users(id)
+);
+
+-- Deprecated alias table for backwards compatibility if needed
 CREATE TABLE IF NOT EXISTS order_status_history (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  order_id INT NOT NULL,
+  id VARCHAR(80) PRIMARY KEY,
+  order_id VARCHAR(50) NOT NULL,
   old_status VARCHAR(50),
   new_status VARCHAR(50) NOT NULL,
   actor_type ENUM('CUSTOMER', 'ADMIN', 'AGENT', 'SYSTEM') NOT NULL,
   actor_id VARCHAR(50),
   notes TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
-  FOREIGN KEY (actor_id) REFERENCES users(id)
-);
-
-CREATE TABLE IF NOT EXISTS tracking_histories (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  order_id INT NOT NULL,
-  status VARCHAR(30) NOT NULL,
-  actor VARCHAR(50) NOT NULL,
-  actor_id VARCHAR(50),
-  notes TEXT,
-  lat NUMERIC(10, 6),
-  lng NUMERIC(10, 6),
-  timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
   FOREIGN KEY (actor_id) REFERENCES users(id)
 );

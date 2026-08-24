@@ -1,5 +1,6 @@
 const { memoryDb } = require('../config/database');
 const { ORDER_STATUS } = require('../config/constants');
+const TrackingHistory = require('../models/TrackingHistory');
 const rateService = require('./rateService');
 const assignmentService = require('./assignmentService');
 const notificationService = require('./notificationService');
@@ -107,9 +108,7 @@ class OrderService {
     const order = memoryDb.orders.find(o => o.id === id);
     if (!order) return null;
 
-    const trackingHistory = memoryDb.trackingHistories
-      .filter(th => th.orderId === id)
-      .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+    const trackingHistory = TrackingHistory.getByOrderId(id);
 
     const agent = order.assignedAgentId
       ? memoryDb.users.find(u => u.id === order.assignedAgentId)
@@ -147,7 +146,7 @@ class OrderService {
     });
   }
 
-  async updateOrderStatus(orderId, { newStatus, actor, actorId, notes, location }) {
+  async updateOrderStatus(orderId, { newStatus, actor, actorId, notes, location, reason }) {
     const order = memoryDb.orders.find(o => o.id === orderId);
     if (!order) throw new Error('Order not found');
 
@@ -155,12 +154,17 @@ class OrderService {
     order.status = newStatus;
     order.updatedAt = new Date().toISOString();
 
+    const actorUser = memoryDb.users.find(u => u.id === actorId);
+
     this.addTrackingHistory({
       orderId,
       status: newStatus,
+      previousStatus: prevStatus,
       actor,
       actorId,
+      actorName: actorUser ? actorUser.name : actor,
       notes: notes || `Status updated from ${prevStatus} to ${newStatus}`,
+      reason,
       location
     });
 
@@ -187,6 +191,7 @@ class OrderService {
     const agent = memoryDb.users.find(u => u.id === agentId);
     if (!agent) throw new Error('Agent not found');
 
+    const prevStatus = order.status;
     order.assignedAgentId = agent.id;
     if (order.status === ORDER_STATUS.CREATED) {
       order.status = ORDER_STATUS.ASSIGNED;
@@ -196,9 +201,12 @@ class OrderService {
     this.addTrackingHistory({
       orderId,
       status: order.status,
+      previousStatus: prevStatus,
       actor,
       actorId,
-      notes: `Order manually assigned to agent ${agent.name}`
+      actorName: actor === 'ADMIN' ? 'System Admin' : agent.name,
+      notes: `Order manually assigned to agent ${agent.name}`,
+      metadata: { assignedAgentId: agent.id, assignedAgentName: agent.name }
     });
 
     return order;
@@ -215,8 +223,10 @@ class OrderService {
       this.addTrackingHistory({
         orderId,
         status: order.status,
+        previousStatus: order.status,
         actor: 'SYSTEM',
         actorId: 'system',
+        actorName: 'Auto-Assignment Dispatcher',
         notes: `Auto-assignment attempted: ${assignment.reason}`
       });
       return {
@@ -226,6 +236,7 @@ class OrderService {
       };
     }
 
+    const prevStatus = order.status;
     order.assignedAgentId = assignment.agent.id;
     if (order.status === ORDER_STATUS.CREATED) {
       order.status = ORDER_STATUS.ASSIGNED;
@@ -235,9 +246,17 @@ class OrderService {
     this.addTrackingHistory({
       orderId,
       status: order.status,
+      previousStatus: prevStatus,
       actor: 'SYSTEM',
       actorId: 'system',
-      notes: `Auto-assignment: ${assignment.reason}`
+      actorName: 'Auto-Assignment Dispatcher',
+      notes: `Auto-assignment: ${assignment.reason}`,
+      location: assignment.agent.currentLocation || null,
+      metadata: {
+        agentId: assignment.agent.id,
+        distanceKm: assignment.distanceKm,
+        isZoneMatch: assignment.isZoneMatch
+      }
     });
 
     return {
@@ -251,6 +270,7 @@ class OrderService {
     const order = memoryDb.orders.find(o => o.id === orderId);
     if (!order) throw new Error('Order not found');
 
+    const prevStatus = order.status;
     order.rescheduleDate = rescheduleDate;
     order.rescheduleReason = rescheduleReason;
     order.updatedAt = new Date().toISOString();
@@ -264,9 +284,13 @@ class OrderService {
       this.addTrackingHistory({
         orderId,
         status: ORDER_STATUS.ASSIGNED,
+        previousStatus: prevStatus,
         actor: 'CUSTOMER',
         actorId: order.customerId,
-        notes: `Rescheduled for ${rescheduleDate}. Reason: ${rescheduleReason}. Auto-assigned: ${assignment.reason}`
+        actorName: order.customerName,
+        notes: `Rescheduled for ${rescheduleDate}. Reason: ${rescheduleReason}. Auto-assigned: ${assignment.reason}`,
+        reason: rescheduleReason,
+        metadata: { rescheduleDate, assignedAgentId: assignment.agent.id }
       });
     } else {
       order.assignedAgentId = null;
@@ -274,28 +298,21 @@ class OrderService {
       this.addTrackingHistory({
         orderId,
         status: ORDER_STATUS.CREATED,
+        previousStatus: prevStatus,
         actor: 'CUSTOMER',
         actorId: order.customerId,
-        notes: `Rescheduled for ${rescheduleDate}. Reason: ${rescheduleReason}. Fallback: ${assignment.reason}. Queued for assignment.`
+        actorName: order.customerName,
+        notes: `Rescheduled for ${rescheduleDate}. Reason: ${rescheduleReason}. Fallback: ${assignment.reason}. Queued for assignment.`,
+        reason: rescheduleReason,
+        metadata: { rescheduleDate }
       });
     }
 
     return order;
   }
 
-  addTrackingHistory({ orderId, status, actor, actorId, notes, location }) {
-    const historyItem = {
-      id: `th-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-      orderId,
-      status,
-      actor,
-      actorId,
-      notes,
-      location: location || null,
-      timestamp: new Date().toISOString()
-    };
-    memoryDb.trackingHistories.push(historyItem);
-    return historyItem;
+  addTrackingHistory(eventData) {
+    return TrackingHistory.append(eventData);
   }
 }
 
