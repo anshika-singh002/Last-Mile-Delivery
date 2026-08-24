@@ -1,20 +1,76 @@
 # Last-Mile Delivery Tracker - System Design Document
 
-## 1. Rate Calculation Engine
-The rate engine evaluates delivery charges dynamically based on:
-1. **Volumetric Weight**: $V = \frac{L \times W \times H}{5000}$.
-2. **Billable Weight**: $W_{\text{billable}} = \max(W_{\text{actual}}, V)$.
-3. **Zone Mapping**: Checks pickup pincode and drop pincode. If $\text{Zone}_{\text{pickup}} == \text{Zone}_{\text{drop}}$, it is classified as **Intra-Zone**, otherwise **Inter-Zone**.
-4. **Rate Card Lookup**: Matches $( \text{OrderType [B2B/B2C]}, \text{IsIntraZone} )$ to pull `base_rate`, `per_kg_rate`, and `cod_surcharge_rate`.
-5. **Total Formula**: $\text{Total} = \text{BaseRate} + (W_{\text{billable}} \times \text{PerKgRate}) + \text{CODSurcharge}$.
+## 1. Architectural Overview
+The Last-Mile Delivery Tracker is a distributed, real-time logistics platform designed for high throughput, sub-second dispatch decisions, and verifiable delivery auditing. The architecture decouples client interfaces (Customer, Agent, Admin) from core business engines via REST APIs and WebSockets.
 
-## 2. Zone Detection & Auto-Assignment
-- Pincodes map to discrete geographic zones.
-- When an order is created, the system uses the Haversine formula to compute distance between the pickup zone center and all available delivery agents' coordinates:
-  $$d = 2r \arcsin\left(\sqrt{\sin^2\left(\frac{\Delta \phi}{2}\right) + \cos(\phi_1)\cos(\phi_2)\sin^2\left(\frac{\Delta \lambda}{2}\right)}\right)$$
-- The agent with the minimum distance is assigned automatically.
+```
++-----------------------------------------------------------------------------------+
+|                            Client Interfaces (React / Vite)                       |
+|   [ Customer Portal ]      [ Agent Mobile Hub ]        [ Admin Control Panel ]    |
++-----------------------------------------------------------------------------------+
+                                   │  ▲
+                         REST / JSON  │  │ WebSockets (Socket.io)
+                                   ▼  │
++-----------------------------------------------------------------------------------+
+|                             Express Backend API Gateway                           |
+|  [ Auth / JWT ]  [ Order Service ]  [ Rate Engine ]  [ Dispatcher ]  [ Notifier ]  |
++-----------------------------------------------------------------------------------+
+                                   │
+                                   ▼
++-----------------------------------------------------------------------------------+
+|                             Storage & Event Ledgers                               |
+| [ Relational DB Models ]    [ Immutable SHA-256 Ledger ]    [ Notification Logs ]  |
++-----------------------------------------------------------------------------------+
+```
 
-## 3. Failed Delivery & Reschedule Protocol
-- When an agent marks a delivery status as `FAILED`, the customer is notified immediately via email/SMS and WebSockets.
-- The customer can select a new delivery date and specify instructions via the Reschedule modal.
-- Upon confirmation, the order status resets to `ASSIGNED` and triggers a fresh auto-assignment cycle to find an active agent.
+---
+
+## 2. Dynamic Rate Calculation Engine
+Delivery pricing evaluates both volumetric and actual weight to prevent undercharging bulky packages:
+1. **Volumetric Weight**:
+   $$V = \frac{\text{Length} \times \text{Width} \times \text{Height}}{5000} \text{ (in kg)}$$
+2. **Billable Weight**:
+   $$W_{\text{billable}} = \max(W_{\text{actual}}, V)$$
+3. **Zone Mapping & Pricing**:
+   - Matches pickup and drop pincodes against registered operational zones.
+   - If $\text{Zone}_{\text{pickup}} = \text{Zone}_{\text{drop}}$, scope is **Intra-Zone**; otherwise **Inter-Zone**.
+   - Pulls applicable `RateCard(OrderType, Scope)`.
+4. **Total Charge Formulation**:
+   $$\text{Total} = \text{BaseRate} + (W_{\text{billable}} \times \text{PerKgRate}) + \text{CODSurcharge}$$
+
+---
+
+## 3. Nearest-Neighbor Auto-Assignment & Capacity Management
+1. **Agent State & Load**:
+   - Each agent maintains an online status (`isAvailable`), a home zone, live GPS coordinates, and an active task cap (`maxActiveDeliveries = 3`).
+2. **Dispatch Algorithm**:
+   - Filters eligible agents where $\text{activeTasks} < \text{maxActiveDeliveries}$ and $\text{isAvailable} = \text{true}$.
+   - Computes geographic distance using the Haversine formula:
+     $$d = 2r \arcsin\left(\sqrt{\sin^2\left(\frac{\Delta \phi}{2}\right) + \cos(\phi_1)\cos(\phi_2)\sin^2\left(\frac{\Delta \lambda}{2}\right)}\right)$$
+   - Priority 1: Same-zone agents ranked by distance and lowest active workload.
+   - Priority 2: Adjacent-zone nearest agents.
+3. **Unassigned Queue Fallback**:
+   - Orders with no available agents transition to `CREATED` (pending queue).
+   - When an agent finishes a delivery or comes online, `processPendingQueue()` triggers auto-assignment.
+
+---
+
+## 4. Immutable Lifecycle Audit Ledger
+1. **Append-Only Model**: State changes (`CREATED`, `ASSIGNED`, `PICKED_UP`, `IN_TRANSIT`, `OUT_FOR_DELIVERY`, `DELIVERED`, `FAILED`) append frozen events to `tracking_histories`.
+2. **Tamper Verification**: Each event calculates a SHA-256 hash:
+   $$\text{Hash} = \text{SHA256}(\text{orderId} + \text{status} + \text{actor} + \text{timestamp} + \text{previousStatus})$$
+3. **Ledger Audit**: `verifyIntegrity(orderId)` recalculates sequential hashes to detect payload tampering.
+
+---
+
+## 5. Failed Delivery & Reschedule Protocol
+1. **Failure Trigger**: When an agent reports `FAILED`, the order status updates, agent capacity is freed, and real-time alerts are emitted via WebSockets, Email, and SMS.
+2. **Customer Reschedule**: The customer selects a new delivery date and adds delivery instructions.
+3. **Reassignment Cycle**: The order transitions to `ASSIGNED` and executes a fresh nearest-neighbor dispatch cycle.
+
+---
+
+## 6. Multi-Channel Notification Pipeline
+1. **Nodemailer (Email)**: Sends branded HTML templates with status badges, delivery ETAs, and action links.
+2. **Twilio (SMS)**: Dispatches transactional SMS updates for time-sensitive status changes.
+3. **Socket.io (WebSockets)**: Streams live GPS agent coordinates and status updates directly to the map interface.
