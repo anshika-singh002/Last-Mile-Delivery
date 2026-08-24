@@ -111,17 +111,19 @@ class NotificationService {
       };
 
       const info = await this.transporter.sendMail(mailOptions);
+      const previewUrl = nodemailer.getTestMessageUrl(info) || null;
       const logEntry = {
         type: 'EMAIL',
         to: customerEmail,
         orderId,
         status: newStatus,
         messageId: info.messageId || `msg-${Date.now()}`,
+        previewUrl,
         timestamp: new Date().toISOString(),
         success: true
       };
       this.notificationLog.push(logEntry);
-      console.log(`📧 [EMAIL SENT] To: ${customerEmail} | Order: ${orderId} | Status: ${newStatus}`);
+      console.log(`📧 [EMAIL SENT] To: ${customerEmail} | Order: ${orderId} | Status: ${newStatus} ${previewUrl ? `| Preview: ${previewUrl}` : ''}`);
       return logEntry;
     } catch (err) {
       console.error(`❌ [EMAIL ERROR] Failed to send email to ${customerEmail}:`, err.message);
