@@ -29,3 +29,13 @@ exports.getAnalytics = async (req, res, next) => {
     next(err);
   }
 };
+
+exports.getNotificationLogs = async (req, res, next) => {
+  try {
+    const notificationService = require('../services/notificationService');
+    const logs = notificationService.getNotificationLogs(req.query.orderId);
+    res.json({ success: true, data: logs });
+  } catch (err) {
+    next(err);
+  }
+};

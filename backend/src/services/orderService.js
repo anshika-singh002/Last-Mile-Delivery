@@ -171,10 +171,10 @@ class OrderService {
     const customer = memoryDb.users.find(u => u.id === order.customerId);
     if (customer) {
       if (newStatus === ORDER_STATUS.FAILED) {
-        notificationService.notifyFailedDelivery(customer, orderId, reason || notes);
+        await notificationService.notifyFailedDelivery(customer, orderId, reason || notes);
       } else {
-        notificationService.sendStatusEmail(customer.email, orderId, newStatus, notes);
-        notificationService.sendStatusSMS(customer.phone, orderId, newStatus);
+        await notificationService.sendStatusEmail(customer.email, orderId, newStatus, notes);
+        await notificationService.sendStatusSMS(customer.phone, orderId, newStatus);
       }
     }
 

@@ -12,6 +12,7 @@ router.use(authenticateToken);
 router.use(checkRole('ADMIN'));
 
 router.get('/analytics', adminController.getAnalytics);
+router.get('/notifications', adminController.getNotificationLogs);
 
 // Zone Management
 router.get('/zones', zoneController.getZones);
