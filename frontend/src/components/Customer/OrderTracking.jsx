@@ -225,8 +225,10 @@ export default function OrderTracking({ orderId, onBack }) {
 
         {/* Map */}
         <TrackingMap
-          pickupLocation={order.pickupLocation || { lat: 37.7749, lng: -122.4194 }}
-          dropLocation={order.dropLocation || { lat: 37.7833, lng: -122.4167 }}
+          pickupLocation={order.pickupLocation}
+          dropLocation={order.dropLocation}
+          pickupPincode={order.pickupPincode}
+          dropPincode={order.dropPincode}
           agentLocation={agentLocation || order.assignedAgent?.currentLocation}
         />
 
