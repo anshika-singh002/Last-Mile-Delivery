@@ -32,5 +32,9 @@ export const orderService = {
   rescheduleOrder: async (id, rescheduleData) => {
     const response = await api.post(`/orders/${id}/reschedule`, rescheduleData);
     return response.data;
+  },
+  getTimeline: async (id) => {
+    const response = await api.get(`/orders/${id}/timeline`);
+    return response.data;
   }
 };
