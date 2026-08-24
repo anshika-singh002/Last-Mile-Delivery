@@ -12,46 +12,60 @@ class ZoneService {
 
   async detectZoneByPincode(pincode) {
     if (!pincode) return null;
+
     const cleanPin = pincode.toString().trim();
-    const zone = memoryDb.zones.find(z => z.pincodes.includes(cleanPin));
-    if (zone) return zone;
-    
-    // Default fallback zone if pincode is unknown
-    return memoryDb.zones[0] || null;
+    const zone = (memoryDb.zones || []).find(
+      z => Array.isArray(z.pincodes) && z.pincodes.map(p => p.toString().trim()).includes(cleanPin)
+    );
+
+    return zone || null;
   }
 
   async createZone({ name, code, pincodes, centerLat, centerLng }) {
+    const normalizedPincodes = Array.isArray(pincodes)
+      ? pincodes.map(p => p.toString().trim()).filter(Boolean)
+      : String(pincodes || '')
+          .split(',')
+          .map(p => p.trim())
+          .filter(Boolean);
+
     const newZone = {
       id: `zone-${Date.now()}`,
       name,
-      code: code.toUpperCase(),
-      pincodes: Array.isArray(pincodes) ? pincodes : pincodes.split(',').map(p => p.trim()),
+      code: String(code || '').toUpperCase(),
+      pincodes: normalizedPincodes,
       centerLat: parseFloat(centerLat) || 37.7749,
       centerLng: parseFloat(centerLng) || -122.4194
     };
+
     memoryDb.zones.push(newZone);
     return newZone;
   }
 
   async updateZone(id, updateData) {
-    const zone = memoryDb.zones.find(z => z.id === id);
+    const zone = (memoryDb.zones || []).find(z => z.id === id);
     if (!zone) throw new Error('Zone not found');
 
     if (updateData.name) zone.name = updateData.name;
-    if (updateData.code) zone.code = updateData.code.toUpperCase();
+    if (updateData.code) zone.code = String(updateData.code).toUpperCase();
+
     if (updateData.pincodes) {
       zone.pincodes = Array.isArray(updateData.pincodes)
-        ? updateData.pincodes
-        : updateData.pincodes.split(',').map(p => p.trim());
+        ? updateData.pincodes.map(p => p.toString().trim()).filter(Boolean)
+        : String(updateData.pincodes)
+            .split(',')
+            .map(p => p.trim())
+            .filter(Boolean);
     }
-    if (updateData.centerLat) zone.centerLat = parseFloat(updateData.centerLat);
-    if (updateData.centerLng) zone.centerLng = parseFloat(updateData.centerLng);
+
+    if (updateData.centerLat != null) zone.centerLat = parseFloat(updateData.centerLat);
+    if (updateData.centerLng != null) zone.centerLng = parseFloat(updateData.centerLng);
 
     return zone;
   }
 
   async deleteZone(id) {
-    const index = memoryDb.zones.findIndex(z => z.id === id);
+    const index = (memoryDb.zones || []).findIndex(z => z.id === id);
     if (index === -1) throw new Error('Zone not found');
     memoryDb.zones.splice(index, 1);
     return true;

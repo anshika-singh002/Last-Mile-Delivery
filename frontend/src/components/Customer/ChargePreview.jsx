@@ -17,6 +17,8 @@ export default function ChargePreview({ previewData }) {
     isIntraZone
   } = previewData;
 
+  const pickupZoneName = previewData.pickupZone?.name || previewData.pickupZone || 'N/A';
+  const dropZoneName = previewData.dropZone?.name || previewData.dropZone || 'N/A';
   const perKgConverted = weightCharge && billableWeight ? weightCharge / billableWeight : 0;
 
   return (
@@ -46,6 +48,14 @@ export default function ChargePreview({ previewData }) {
       </div>
 
       <div className="space-y-2 text-xs text-slate-300 pt-2 border-t border-slate-900">
+        <div className="flex justify-between">
+          <span>Pickup Zone</span>
+          <span className="font-semibold text-white">{pickupZoneName}</span>
+        </div>
+        <div className="flex justify-between">
+          <span>Drop Zone</span>
+          <span className="font-semibold text-white">{dropZoneName}</span>
+        </div>
         <div className="flex justify-between">
           <span>Base Charge ({isIntraZone ? 'Intra' : 'Inter'})</span>
           <span className="font-semibold text-white">{formatPrice(baseCharge)}</span>

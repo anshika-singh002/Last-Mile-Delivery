@@ -9,6 +9,15 @@ exports.getRateCards = async (req, res, next) => {
   }
 };
 
+exports.createRateCard = async (req, res, next) => {
+  try {
+    const card = await rateService.createRateCard(req.body);
+    res.status(201).json({ success: true, data: card });
+  } catch (err) {
+    next(err);
+  }
+};
+
 exports.updateRateCard = async (req, res, next) => {
   try {
     const card = await rateService.updateRateCard(req.params.id, req.body);

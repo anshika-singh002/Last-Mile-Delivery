@@ -7,6 +7,37 @@ class RateService {
     return memoryDb.rateCards || [];
   }
 
+  async createRateCard(rateData) {
+    const orderType = String(rateData.orderType || '').toUpperCase();
+
+    if (!['B2B', 'B2C'].includes(orderType)) {
+      throw new Error('Invalid order type');
+    }
+
+    const isIntraZone = Boolean(rateData.isIntraZone);
+
+    const existingCard = (memoryDb.rateCards || []).find(
+      r => r.orderType === orderType && r.isIntraZone === isIntraZone
+    );
+
+    const payload = {
+      id: existingCard ? existingCard.id : `rate-${Date.now()}`,
+      orderType,
+      isIntraZone,
+      baseRate: parseFloat(rateData.baseRate ?? 0),
+      perKgRate: parseFloat(rateData.perKgRate ?? 0),
+      codSurchargeRate: parseFloat(rateData.codSurchargeRate ?? 0)
+    };
+
+    if (existingCard) {
+      Object.assign(existingCard, payload);
+      return existingCard;
+    }
+
+    memoryDb.rateCards.push(payload);
+    return payload;
+  }
+
   async updateRateCard(id, updateData) {
     const card = (memoryDb.rateCards || []).find(r => r.id === id);
     if (!card) throw new Error('Rate card not found');
@@ -14,7 +45,7 @@ class RateService {
     if (updateData.baseRate != null) card.baseRate = parseFloat(updateData.baseRate);
     if (updateData.perKgRate != null) card.perKgRate = parseFloat(updateData.perKgRate);
     if (updateData.codSurchargeRate != null) card.codSurchargeRate = parseFloat(updateData.codSurchargeRate);
-    if (updateData.orderType) card.orderType = updateData.orderType;
+    if (updateData.orderType) card.orderType = String(updateData.orderType).toUpperCase();
     if (updateData.isIntraZone != null) card.isIntraZone = Boolean(updateData.isIntraZone);
 
     return card;
@@ -31,7 +62,15 @@ class RateService {
     const pickupZone = await zoneService.detectZoneByPincode(pickupPincode);
     const dropZone = await zoneService.detectZoneByPincode(dropPincode);
 
-    const isIntraZone = pickupZone && dropZone && pickupZone.id === dropZone.id;
+    if (!pickupZone) {
+      throw new Error(`No zone configured for pickup pincode ${pickupPincode}`);
+    }
+
+    if (!dropZone) {
+      throw new Error(`No zone configured for drop pincode ${dropPincode}`);
+    }
+
+    const isIntraZone = pickupZone.id === dropZone.id;
 
     const l = parseFloat(dimensions?.length || 0);
     const w = parseFloat(dimensions?.width || 0);
@@ -44,7 +83,7 @@ class RateService {
     const normalizedOrderType = String(orderType || '').toUpperCase();
     const normalizedPaymentType = String(paymentType || '').toUpperCase();
 
-    let rateCard = (memoryDb.rateCards || []).find(
+    const rateCard = (memoryDb.rateCards || []).find(
       r => r.orderType === normalizedOrderType && r.isIntraZone === isIntraZone
     );
 
@@ -56,9 +95,10 @@ class RateService {
 
     const baseCharge = parseFloat(Number(rateCard.baseRate || 0).toFixed(2));
     const weightCharge = parseFloat((billableWeight * Number(rateCard.perKgRate || 0)).toFixed(2));
-    const codSurcharge = normalizedPaymentType === 'COD'
-      ? parseFloat(Number(rateCard.codSurchargeRate || 0).toFixed(2))
-      : 0;
+    const codSurcharge =
+      normalizedPaymentType === 'COD'
+        ? parseFloat(Number(rateCard.codSurchargeRate || 0).toFixed(2))
+        : 0;
 
     const totalCharge = parseFloat((baseCharge + weightCharge + codSurcharge).toFixed(2));
 

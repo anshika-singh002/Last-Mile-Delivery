@@ -25,6 +25,10 @@ export const adminService = {
     const response = await api.get('/admin/rate-cards');
     return response.data;
   },
+  createRateCard: async (cardData) => {
+    const response = await api.post('/admin/rate-cards', cardData);
+    return response.data;
+  },
   updateRateCard: async (id, cardData) => {
     const response = await api.put(`/admin/rate-cards/${id}`, cardData);
     return response.data;

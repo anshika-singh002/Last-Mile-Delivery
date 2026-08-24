@@ -18,7 +18,6 @@ class OrderService {
     paymentType,
     autoAssign = true
   }) {
-    // Calculate pricing details
     const calculation = await rateService.calculateOrderCharge({
       pickupPincode,
       dropPincode,
@@ -28,7 +27,10 @@ class OrderService {
       paymentType
     });
 
+    const normalizedOrderType = String(orderType || '').toUpperCase();
+    const normalizedPaymentType = String(paymentType || '').toUpperCase();
     const orderId = `ord-${Date.now()}`;
+
     const newOrder = {
       id: orderId,
       customerId,
@@ -47,8 +49,8 @@ class OrderService {
       actualWeight: parseFloat(actualWeight),
       volumetricWeight: calculation.volumetricWeight,
       billableWeight: calculation.billableWeight,
-      orderType,
-      paymentType,
+      orderType: normalizedOrderType,
+      paymentType: normalizedPaymentType,
       baseCharge: calculation.baseCharge,
       weightCharge: calculation.weightCharge,
       codSurcharge: calculation.codSurcharge,
@@ -61,7 +63,6 @@ class OrderService {
 
     memoryDb.orders.unshift(newOrder);
 
-    // Record initial tracking history
     this.addTrackingHistory({
       orderId,
       status: ORDER_STATUS.CREATED,
@@ -70,7 +71,6 @@ class OrderService {
       notes: 'Order created successfully.'
     });
 
-    // Auto-assignment if enabled
     if (autoAssign) {
       const bestAgent = await assignmentService.autoAssignAgent(newOrder, calculation.pickupZone);
       if (bestAgent) {
