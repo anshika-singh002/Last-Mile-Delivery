@@ -50,41 +50,90 @@ export default function TrackingMap({ pickupLocation, dropLocation, agentLocatio
   const [resolvedPickup, setResolvedPickup] = useState(pickupLocation);
   const [resolvedDrop, setResolvedDrop] = useState(dropLocation);
 
-  // Client-side fallback: If coordinates are default/missing, resolve via live geocoding API
+  // Client-side fallback: If coordinates are default/missing or out-of-sync with pincodes, resolve via live geocoding API
   useEffect(() => {
     let isMounted = true;
-    async function resolveCoords() {
-      // If pickup coordinates are missing or default SF center and we have a pincode
-      if (pickupPincode && (!pickupLocation || (Math.abs(pickupLocation.lat - 37.7749) < 0.001 && Math.abs(pickupLocation.lng - (-122.4194)) < 0.001))) {
-        try {
-          const res = await fetch(`https://api.zippopotam.us/in/${pickupPincode.trim()}`);
-          if (res.ok) {
-            const data = await res.json();
-            if (isMounted && data.places && data.places[0]) {
-              setResolvedPickup({ lat: parseFloat(data.places[0].latitude), lng: parseFloat(data.places[0].longitude) });
+    async function resolvePincodeGeo(pincode) {
+      if (!pincode) return null;
+      const cleanPin = String(pincode).trim();
+
+      // Check known Indian table
+      const PINCODE_MAP = {
+        '390022': { lat: 22.3323, lng: 73.2207 },
+        '390019': { lat: 22.3030, lng: 73.2329 },
+        '110001': { lat: 28.6333, lng: 77.2167 },
+        '560001': { lat: 12.9716, lng: 77.5946 },
+        '400001': { lat: 18.9322, lng: 72.8347 },
+        '500001': { lat: 17.3850, lng: 78.4867 },
+        '600001': { lat: 13.0827, lng: 80.2707 },
+        '700001': { lat: 22.5726, lng: 88.3639 },
+        '411001': { lat: 18.5204, lng: 73.8567 },
+        '380001': { lat: 23.0225, lng: 72.5714 }
+      };
+
+      if (PINCODE_MAP[cleanPin]) return PINCODE_MAP[cleanPin];
+
+      // 1. Try Nominatim with countrycodes=in for 6-digit PIN
+      try {
+        const r = await fetch(`https://nominatim.openstreetmap.org/search?postalcode=${cleanPin}&countrycodes=in&format=json&limit=1`);
+        if (r.ok) {
+          const d = await r.json();
+          if (d && d[0]) {
+            return { lat: parseFloat(d[0].lat), lng: parseFloat(d[0].lon) };
+          }
+        }
+      } catch (e) {}
+
+      // 2. Try Zippopotam
+      try {
+        const r = await fetch(`https://api.zippopotam.us/in/${cleanPin}`);
+        if (r.ok) {
+          const d = await r.json();
+          if (d.places && d.places[0]) {
+            return { lat: parseFloat(d.places[0].latitude), lng: parseFloat(d.places[0].longitude) };
+          }
+        }
+      } catch (e) {}
+
+      // 3. Try Postal Pincode API
+      try {
+        const r = await fetch(`https://api.postalpincode.in/pincode/${cleanPin}`);
+        if (r.ok) {
+          const d = await r.json();
+          if (d[0]?.Status === 'Success' && d[0]?.PostOffice?.[0]) {
+            const po = d[0].PostOffice[0];
+            const q = `${po.District}, ${po.State}, India`;
+            const or = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1`);
+            if (or.ok) {
+              const od = await or.json();
+              if (od && od[0]) {
+                return { lat: parseFloat(od[0].lat), lng: parseFloat(od[0].lon) };
+              }
             }
           }
-        } catch (e) {}
+        }
+      } catch (e) {}
+
+      return null;
+    }
+
+    async function loadLocations() {
+      if (pickupPincode) {
+        const geo = await resolvePincodeGeo(pickupPincode);
+        if (geo && isMounted) setResolvedPickup(geo);
       } else if (pickupLocation) {
         setResolvedPickup(pickupLocation);
       }
 
-      // If drop coordinates are missing or default SF center and we have a pincode
-      if (dropPincode && (!dropLocation || (Math.abs(dropLocation.lat - 37.7833) < 0.001 && Math.abs(dropLocation.lng - (-122.4167)) < 0.001))) {
-        try {
-          const res = await fetch(`https://api.zippopotam.us/in/${dropPincode.trim()}`);
-          if (res.ok) {
-            const data = await res.json();
-            if (isMounted && data.places && data.places[0]) {
-              setResolvedDrop({ lat: parseFloat(data.places[0].latitude), lng: parseFloat(data.places[0].longitude) });
-            }
-          }
-        } catch (e) {}
+      if (dropPincode) {
+        const geo = await resolvePincodeGeo(dropPincode);
+        if (geo && isMounted) setResolvedDrop(geo);
       } else if (dropLocation) {
         setResolvedDrop(dropLocation);
       }
     }
-    resolveCoords();
+
+    loadLocations();
     return () => { isMounted = false; };
   }, [pickupLocation, dropLocation, pickupPincode, dropPincode]);
 
