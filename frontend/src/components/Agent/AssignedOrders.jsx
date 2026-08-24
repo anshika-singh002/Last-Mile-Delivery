@@ -263,50 +263,80 @@ export default function AssignedOrders({ onSelectOrder }) {
                 </div>
 
                 {/* Quick Status Action Buttons */}
-                <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-900">
-                  <div className="flex flex-wrap gap-2">
+                <div className="space-y-3 pt-3 border-t border-slate-900">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center space-x-2">
+                      <span className="text-slate-400 font-bold text-xs uppercase tracking-wider">Update Delivery Stage:</span>
+                    </div>
+
                     <button
-                      onClick={() => handleUpdateStatus(order.id, 'PICKED_UP')}
-                      className="px-3 py-1.5 bg-sky-500/10 border border-sky-500/20 hover:bg-sky-500/20 text-sky-400 font-semibold text-xs rounded-lg transition"
+                      onClick={() => handleSimulateLiveLocation(order)}
+                      disabled={simulatingOrderId === order.id}
+                      className="px-3.5 py-1.5 bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white font-bold text-xs rounded-xl transition flex items-center space-x-1.5 shadow-md self-start sm:self-auto"
                     >
-                      Mark Picked Up
-                    </button>
-                    <button
-                      onClick={() => handleUpdateStatus(order.id, 'IN_TRANSIT')}
-                      className="px-3 py-1.5 bg-indigo-500/10 border border-indigo-500/20 hover:bg-indigo-500/20 text-indigo-400 font-semibold text-xs rounded-lg transition"
-                    >
-                      In Transit
-                    </button>
-                    <button
-                      onClick={() => handleUpdateStatus(order.id, 'OUT_FOR_DELIVERY')}
-                      className="px-3 py-1.5 bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/20 text-amber-400 font-semibold text-xs rounded-lg transition"
-                    >
-                      Out for Delivery
-                    </button>
-                    <button
-                      onClick={() => handleUpdateStatus(order.id, 'DELIVERED')}
-                      className="px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/20 text-emerald-400 font-semibold text-xs rounded-lg transition flex items-center space-x-1"
-                    >
-                      <CheckCircle className="w-3.5 h-3.5" />
-                      <span>Delivered</span>
-                    </button>
-                    <button
-                      onClick={() => handleUpdateStatus(order.id, 'FAILED')}
-                      className="px-3 py-1.5 bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500/20 text-rose-400 font-semibold text-xs rounded-lg transition flex items-center space-x-1"
-                    >
-                      <XCircle className="w-3.5 h-3.5" />
-                      <span>Delivery Failed</span>
+                      <Truck className="w-4 h-4 animate-pulse" />
+                      <span>{simulatingOrderId === order.id ? 'Broadcasting Live Movement...' : '📡 Broadcast Live GPS Movement'}</span>
                     </button>
                   </div>
 
-                  <button
-                    onClick={() => handleSimulateLiveLocation(order)}
-                    disabled={simulatingOrderId === order.id}
-                    className="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white font-bold text-xs rounded-lg transition flex items-center space-x-1 shadow-md"
-                  >
-                    <Truck className="w-3.5 h-3.5 animate-pulse" />
-                    <span>{simulatingOrderId === order.id ? 'Broadcasting GPS...' : '📡 Broadcast Live GPS Movement'}</span>
-                  </button>
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                    <button
+                      onClick={() => handleUpdateStatus(order.id, 'PICKED_UP')}
+                      className={`px-3 py-2 text-xs font-bold rounded-xl border transition flex items-center justify-center space-x-1.5 ${
+                        order.status === 'PICKED_UP'
+                          ? 'bg-sky-500 text-white border-sky-400 shadow-lg shadow-sky-500/20 ring-2 ring-sky-400/40'
+                          : 'bg-slate-900 text-sky-400 border-sky-500/30 hover:bg-sky-500/20'
+                      }`}
+                    >
+                      <span>1. Picked Up</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleUpdateStatus(order.id, 'IN_TRANSIT')}
+                      className={`px-3 py-2 text-xs font-bold rounded-xl border transition flex items-center justify-center space-x-1.5 ${
+                        order.status === 'IN_TRANSIT'
+                          ? 'bg-indigo-500 text-white border-indigo-400 shadow-lg shadow-indigo-500/20 ring-2 ring-indigo-400/40'
+                          : 'bg-slate-900 text-indigo-400 border-indigo-500/30 hover:bg-indigo-500/20'
+                      }`}
+                    >
+                      <span>2. In Transit</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleUpdateStatus(order.id, 'OUT_FOR_DELIVERY')}
+                      className={`px-3 py-2 text-xs font-bold rounded-xl border transition flex items-center justify-center space-x-1.5 ${
+                        order.status === 'OUT_FOR_DELIVERY'
+                          ? 'bg-amber-500 text-white border-amber-400 shadow-lg shadow-amber-500/20 ring-2 ring-amber-400/40'
+                          : 'bg-slate-900 text-amber-400 border-amber-500/30 hover:bg-amber-500/20'
+                      }`}
+                    >
+                      <span>3. Out For Delivery</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleUpdateStatus(order.id, 'DELIVERED')}
+                      className={`px-3 py-2 text-xs font-bold rounded-xl border transition flex items-center justify-center space-x-1.5 ${
+                        order.status === 'DELIVERED'
+                          ? 'bg-emerald-500 text-white border-emerald-400 shadow-lg shadow-emerald-500/20 ring-2 ring-emerald-400/40'
+                          : 'bg-slate-900 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20'
+                      }`}
+                    >
+                      <CheckCircle className="w-3.5 h-3.5" />
+                      <span>4. Delivered</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleUpdateStatus(order.id, 'FAILED')}
+                      className={`px-3 py-2 text-xs font-bold rounded-xl border transition flex items-center justify-center space-x-1.5 ${
+                        order.status === 'FAILED'
+                          ? 'bg-rose-600 text-white border-rose-500 shadow-lg shadow-rose-600/20 ring-2 ring-rose-400/40'
+                          : 'bg-slate-900 text-rose-400 border-rose-500/30 hover:bg-rose-500/20'
+                      }`}
+                    >
+                      <XCircle className="w-3.5 h-3.5" />
+                      <span>5. Failed</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}

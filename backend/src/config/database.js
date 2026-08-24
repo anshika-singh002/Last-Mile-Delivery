@@ -15,27 +15,39 @@ const memoryDb = {
     },
     {
       id: 'agent-1',
-      name: 'Bob Agent (Alpha)',
+      name: 'Bob Agent (Delhi Hub)',
       email: 'agent1@demo.com',
       passwordHash: bcrypt.hashSync('password123', 10),
       role: USER_ROLES.AGENT,
-      phone: '+1 555-0211',
+      phone: '+91 9876543210',
       isAvailable: true,
       maxActiveDeliveries: 3,
       currentZoneId: 'zone-1',
-      currentLocation: { lat: 37.7749, lng: -122.4194 }
+      currentLocation: { lat: 28.6333, lng: 77.2167 }
     },
     {
       id: 'agent-2',
-      name: 'Charlie Agent (Beta)',
+      name: 'Charlie Agent (Bengaluru Hub)',
       email: 'agent2@demo.com',
       passwordHash: bcrypt.hashSync('password123', 10),
       role: USER_ROLES.AGENT,
-      phone: '+1 555-0322',
+      phone: '+91 9876543211',
       isAvailable: true,
       maxActiveDeliveries: 3,
       currentZoneId: 'zone-2',
-      currentLocation: { lat: 37.7833, lng: -122.4167 }
+      currentLocation: { lat: 12.9716, lng: 77.5946 }
+    },
+    {
+      id: 'agent-3',
+      name: 'David Agent (Gujarat/Mumbai Hub)',
+      email: 'agent3@demo.com',
+      passwordHash: bcrypt.hashSync('password123', 10),
+      role: USER_ROLES.AGENT,
+      phone: '+91 9876543212',
+      isAvailable: true,
+      maxActiveDeliveries: 3,
+      currentZoneId: 'zone-3',
+      currentLocation: { lat: 22.3030, lng: 73.2329 }
     },
     {
       id: 'admin-1',

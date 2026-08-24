@@ -59,18 +59,26 @@ class RateService {
     orderType,
     paymentType
   }) {
-    const pickupZone = await zoneService.detectZoneByPincode(pickupPincode);
-    const dropZone = await zoneService.detectZoneByPincode(dropPincode);
+    let pickupZone = await zoneService.detectZoneByPincode(pickupPincode);
+    let dropZone = await zoneService.detectZoneByPincode(dropPincode);
 
-    if (!pickupZone) {
-      throw new Error(`No zone configured for pickup pincode ${pickupPincode}`);
+    if (!pickupZone && pickupPincode) {
+      pickupZone = await zoneService.createZone({
+        name: `Zone ${pickupPincode}`,
+        code: `Z-${String(pickupPincode).slice(-3)}`,
+        pincodes: [pickupPincode]
+      });
     }
 
-    if (!dropZone) {
-      throw new Error(`No zone configured for drop pincode ${dropPincode}`);
+    if (!dropZone && dropPincode) {
+      dropZone = await zoneService.createZone({
+        name: `Zone ${dropPincode}`,
+        code: `Z-${String(dropPincode).slice(-3)}`,
+        pincodes: [dropPincode]
+      });
     }
 
-    const isIntraZone = pickupZone.id === dropZone.id;
+    const isIntraZone = Boolean(pickupZone && dropZone && pickupZone.id === dropZone.id);
 
     const l = parseFloat(dimensions?.length || 0);
     const w = parseFloat(dimensions?.width || 0);

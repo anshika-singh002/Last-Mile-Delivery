@@ -61,8 +61,18 @@ class AssignmentService {
       };
     }
 
-    const pickupLat = pickupZone?.centerLat != null ? parseFloat(pickupZone.centerLat) : 37.7749;
-    const pickupLng = pickupZone?.centerLng != null ? parseFloat(pickupZone.centerLng) : -122.4194;
+    const pickupLat = order?.pickupLocation?.lat != null
+      ? parseFloat(order.pickupLocation.lat)
+      : pickupZone?.centerLat != null
+        ? parseFloat(pickupZone.centerLat)
+        : 28.6333;
+
+    const pickupLng = order?.pickupLocation?.lng != null
+      ? parseFloat(order.pickupLocation.lng)
+      : pickupZone?.centerLng != null
+        ? parseFloat(pickupZone.centerLng)
+        : 77.2167;
+
     const pickupZoneId = pickupZone?.id || order?.pickupZoneId;
 
     // 2. Score and rank eligible agents
