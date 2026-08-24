@@ -15,6 +15,7 @@ const io = new Server(server, {
 
 setupSocket(io);
 
+// Entry point
 server.listen(PORT, () => {
   console.log(`🚀 Last-Mile Delivery Backend Server running on port ${PORT}`);
   console.log(`📡 WebSocket server active`);
