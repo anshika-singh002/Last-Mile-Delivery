@@ -1,7 +1,10 @@
 import React from 'react';
 import { Calculator, ShieldAlert, CheckCircle } from 'lucide-react';
+import { useCurrency } from '../../context/CurrencyContext';
 
 export default function ChargePreview({ previewData }) {
+  const { formatPrice, currency } = useCurrency();
+
   if (!previewData) return null;
 
   const {
@@ -16,12 +19,14 @@ export default function ChargePreview({ previewData }) {
     dropZone
   } = previewData;
 
+  const perKgConverted = weightCharge && billableWeight ? weightCharge / billableWeight : 0;
+
   return (
     <div className="bg-slate-950 border border-slate-800 rounded-2xl p-5 space-y-4">
       <div className="flex items-center justify-between border-b border-slate-800 pb-3">
         <div className="flex items-center space-x-2">
           <Calculator className="w-5 h-5 text-sky-400" />
-          <h3 className="font-bold text-white text-base">Rate Calculation Breakdown</h3>
+          <h3 className="font-bold text-white text-base">Rate Calculation Breakdown ({currency.code})</h3>
         </div>
         <span className="text-xs font-semibold px-2.5 py-1 rounded-md bg-sky-500/10 border border-sky-500/20 text-sky-400">
           {isIntraZone ? 'Intra-Zone (Same Area)' : 'Inter-Zone (Cross Area)'}
@@ -45,21 +50,21 @@ export default function ChargePreview({ previewData }) {
       <div className="space-y-2 text-xs text-slate-300 pt-2 border-t border-slate-900">
         <div className="flex justify-between">
           <span>Base Charge ({isIntraZone ? 'Intra' : 'Inter'})</span>
-          <span className="font-semibold text-white">${baseCharge?.toFixed(2)}</span>
+          <span className="font-semibold text-white">{formatPrice(baseCharge)}</span>
         </div>
         <div className="flex justify-between">
-          <span>Weight Charge (${weightCharge ? (weightCharge / billableWeight).toFixed(2) : 0}/kg)</span>
-          <span className="font-semibold text-white">${weightCharge?.toFixed(2)}</span>
+          <span>Weight Charge ({formatPrice(perKgConverted)}/kg)</span>
+          <span className="font-semibold text-white">{formatPrice(weightCharge)}</span>
         </div>
         {codSurcharge > 0 && (
           <div className="flex justify-between text-amber-400">
             <span>COD Surcharge</span>
-            <span className="font-semibold">+${codSurcharge?.toFixed(2)}</span>
+            <span className="font-semibold">+{formatPrice(codSurcharge)}</span>
           </div>
         )}
         <div className="flex justify-between pt-3 border-t border-slate-800 text-sm font-bold text-white">
           <span>Total Delivery Charge</span>
-          <span className="text-sky-400 text-lg">${totalCharge?.toFixed(2)}</span>
+          <span className="text-sky-400 text-lg">{formatPrice(totalCharge)}</span>
         </div>
       </div>
     </div>

@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { adminService } from '../../services/adminService';
 import { useNotification } from '../../context/NotificationContext';
+import { useCurrency } from '../../context/CurrencyContext';
 import LoadingSpinner from '../Common/LoadingSpinner';
 import { CreditCard, Save } from 'lucide-react';
 
 export default function RateCardConfig() {
   const { addToast } = useNotification();
+  const { currency } = useCurrency();
   const [cards, setCards] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -44,19 +46,19 @@ export default function RateCardConfig() {
     <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
       <div>
         <h2 className="text-xl font-bold text-white">Rate Card Configuration Engine</h2>
-        <p className="text-xs text-slate-400">Configure base rates, per-kg pricing, and COD surcharges dynamically</p>
+        <p className="text-xs text-slate-400">Configure base rates, per-kg pricing, and COD surcharges dynamically ({currency.code})</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {cards.map((card) => (
-          <RateCardItem key={card.id} card={card} onSave={handleUpdateRate} />
+          <RateCardItem key={card.id} card={card} onSave={handleUpdateRate} currencySymbol={currency.symbol} />
         ))}
       </div>
     </div>
   );
 }
 
-function RateCardItem({ card, onSave }) {
+function RateCardItem({ card, onSave, currencySymbol }) {
   const [baseRate, setBaseRate] = useState(card.baseRate);
   const [perKgRate, setPerKgRate] = useState(card.perKgRate);
   const [codSurchargeRate, setCodSurchargeRate] = useState(card.codSurchargeRate);
@@ -75,7 +77,7 @@ function RateCardItem({ card, onSave }) {
 
       <div className="grid grid-cols-3 gap-3 text-xs">
         <div>
-          <label className="block text-slate-400 mb-1">Base Rate ($)</label>
+          <label className="block text-slate-400 mb-1">Base Rate ({currencySymbol})</label>
           <input
             type="number"
             step="0.5"
@@ -86,7 +88,7 @@ function RateCardItem({ card, onSave }) {
         </div>
 
         <div>
-          <label className="block text-slate-400 mb-1">Per-Kg Rate ($)</label>
+          <label className="block text-slate-400 mb-1">Per-Kg Rate ({currencySymbol})</label>
           <input
             type="number"
             step="0.1"
@@ -97,7 +99,7 @@ function RateCardItem({ card, onSave }) {
         </div>
 
         <div>
-          <label className="block text-slate-400 mb-1">COD Surcharge ($)</label>
+          <label className="block text-slate-400 mb-1">COD Surcharge ({currencySymbol})</label>
           <input
             type="number"
             step="0.5"

@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { adminService } from '../../services/adminService';
+import { useCurrency } from '../../context/CurrencyContext';
 import LoadingSpinner from '../Common/LoadingSpinner';
 import { LayoutDashboard, Package, Truck, DollarSign, CheckCircle2, AlertCircle } from 'lucide-react';
 
 export default function Dashboard() {
+  const { formatPrice, currency } = useCurrency();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -38,8 +40,8 @@ export default function Dashboard() {
             <span className="text-xs font-semibold uppercase tracking-wider">Total Revenue</span>
             <DollarSign className="w-5 h-5 text-emerald-400" />
           </div>
-          <p className="text-2xl font-extrabold text-white">${stats.totalRevenue}</p>
-          <span className="text-[10px] text-slate-500 block">Auto-calculated charges</span>
+          <p className="text-2xl font-extrabold text-white">{formatPrice(stats.totalRevenue)}</p>
+          <span className="text-[10px] text-slate-500 block">Converted to {currency.code}</span>
         </div>
 
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-2">

@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { orderService } from '../../services/orderService';
+import { useCurrency } from '../../context/CurrencyContext';
 import LoadingSpinner from '../Common/LoadingSpinner';
 import { Package, Search, ExternalLink, Calendar, MapPin } from 'lucide-react';
 
 export default function OrderList({ onSelectOrder }) {
+  const { formatPrice } = useCurrency();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -95,7 +97,7 @@ export default function OrderList({ onSelectOrder }) {
               <div className="flex items-center justify-between md:justify-end space-x-6">
                 <div className="text-right">
                   <span className="text-xs text-slate-400 block">Total</span>
-                  <span className="text-sm font-bold text-white">${order.totalCharge?.toFixed(2)}</span>
+                  <span className="text-sm font-bold text-white">{formatPrice(order.totalCharge)}</span>
                 </div>
 
                 <div className="flex items-center space-x-3">

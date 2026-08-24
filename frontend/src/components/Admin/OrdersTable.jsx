@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { adminService } from '../../services/adminService';
 import { orderService } from '../../services/orderService';
-import { useNotification } from '../../context/NotificationContext';
+import { useCurrency } from '../../context/CurrencyContext';
 import LoadingSpinner from '../Common/LoadingSpinner';
 import { Package, UserCheck, Search, Filter } from 'lucide-react';
 
 export default function OrdersTable() {
+  const { formatPrice } = useCurrency();
   const { addToast } = useNotification();
   const [orders, setOrders] = useState([]);
   const [agents, setAgents] = useState([]);
@@ -128,7 +129,7 @@ export default function OrdersTable() {
                 <td className="px-4 py-3.5">
                   <span className="px-2 py-0.5 rounded bg-slate-800 font-bold">{order.orderType}</span>
                 </td>
-                <td className="px-4 py-3.5 font-bold text-white">${order.totalCharge?.toFixed(2)}</td>
+                <td className="px-4 py-3.5 font-bold text-white">{formatPrice(order.totalCharge)}</td>
                 <td className="px-4 py-3.5">
                   <span className={`px-2.5 py-1 rounded-full font-bold border text-[10px] ${
                     order.status === 'DELIVERED' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' :

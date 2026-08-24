@@ -1,10 +1,12 @@
 import React from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { Truck, LogOut, User } from 'lucide-react';
+import { useCurrency } from '../../context/CurrencyContext';
+import { Truck, LogOut, User, DollarSign, Globe } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export default function Navbar() {
   const { user, logout } = useAuth();
+  const { currencyCode, changeCurrency, currencies } = useCurrency();
 
   return (
     <header className="bg-slate-950 border-b border-slate-800 sticky top-0 z-40">
@@ -19,25 +21,43 @@ export default function Navbar() {
           </div>
         </Link>
 
-        {user ? (
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800">
-              <User className="w-4 h-4 text-sky-400" />
-              <div className="text-xs">
-                <span className="font-semibold text-slate-200 block">{user.name}</span>
-                <span className="text-sky-400 font-medium capitalize">{user.role}</span>
-              </div>
-            </div>
-
-            <button
-              onClick={logout}
-              className="p-2 text-slate-400 hover:text-red-400 hover:bg-slate-900 rounded-lg transition-colors flex items-center space-x-1"
-              title="Logout"
+        <div className="flex items-center space-x-3">
+          {/* Currency Selector */}
+          <div className="relative flex items-center bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-xs">
+            <Globe className="w-3.5 h-3.5 text-sky-400 mr-1.5 shrink-0" />
+            <select
+              value={currencyCode}
+              onChange={(e) => changeCurrency(e.target.value)}
+              className="bg-transparent text-slate-200 font-semibold focus:outline-none cursor-pointer pr-1"
             >
-              <LogOut className="w-5 h-5" />
-            </button>
+              {currencies.map((c) => (
+                <option key={c.code} value={c.code} className="bg-slate-900 text-white">
+                  {c.code} ({c.symbol})
+                </option>
+              ))}
+            </select>
           </div>
-        ) : null}
+
+          {user ? (
+            <div className="flex items-center space-x-3">
+              <div className="flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800">
+                <User className="w-4 h-4 text-sky-400" />
+                <div className="text-xs">
+                  <span className="font-semibold text-slate-200 block">{user.name}</span>
+                  <span className="text-sky-400 font-medium capitalize">{user.role}</span>
+                </div>
+              </div>
+
+              <button
+                onClick={logout}
+                className="p-2 text-slate-400 hover:text-red-400 hover:bg-slate-900 rounded-lg transition-colors flex items-center space-x-1"
+                title="Logout"
+              >
+                <LogOut className="w-5 h-5" />
+              </button>
+            </div>
+          ) : null}
+        </div>
       </div>
     </header>
   );
