@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
+import React, { useEffect } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 
 // Custom icons
@@ -30,18 +30,31 @@ const agentIcon = L.icon({
   shadowSize: [41, 41]
 });
 
-export default function TrackingMap({ pickupLocation, dropLocation, agentLocation }) {
-  const defaultCenter = [37.7749, -122.4194]; // San Francisco center
+// Helper component to auto-recenter and fit bounds dynamically
+function MapBoundsUpdater({ bounds }) {
+  const map = useMap();
+  useEffect(() => {
+    if (bounds && bounds.length > 0) {
+      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 });
+    }
+  }, [bounds, map]);
+  return null;
+}
 
-  const pLat = pickupLocation?.lat || 37.7749;
-  const pLng = pickupLocation?.lng || -122.4194;
-  const dLat = dropLocation?.lat || 37.7833;
-  const dLng = dropLocation?.lng || -122.4167;
+export default function TrackingMap({ pickupLocation, dropLocation, agentLocation }) {
+  const pLat = Number(pickupLocation?.lat) || 37.7749;
+  const pLng = Number(pickupLocation?.lng) || -122.4194;
+  const dLat = Number(dropLocation?.lat) || 37.7833;
+  const dLng = Number(dropLocation?.lng) || -122.4167;
 
   const positions = [
     [pLat, pLng],
     [dLat, dLng]
   ];
+
+  if (agentLocation?.lat && agentLocation?.lng) {
+    positions.push([Number(agentLocation.lat), Number(agentLocation.lng)]);
+  }
 
   return (
     <div className="w-full h-80 rounded-2xl overflow-hidden border border-slate-800 relative z-0">
@@ -56,11 +69,14 @@ export default function TrackingMap({ pickupLocation, dropLocation, agentLocatio
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 
+        <MapBoundsUpdater bounds={positions} />
+
         {/* Pickup Marker */}
         <Marker position={[pLat, pLng]} icon={pickupIcon}>
           <Popup>
             <div className="text-slate-900 font-semibold text-xs">
               <strong>Pickup Location</strong>
+              <div className="text-[10px] text-slate-600 font-mono">[{pLat.toFixed(4)}, {pLng.toFixed(4)}]</div>
             </div>
           </Popup>
         </Marker>
@@ -70,23 +86,25 @@ export default function TrackingMap({ pickupLocation, dropLocation, agentLocatio
           <Popup>
             <div className="text-slate-900 font-semibold text-xs">
               <strong>Drop Location</strong>
+              <div className="text-[10px] text-slate-600 font-mono">[{dLat.toFixed(4)}, {dLng.toFixed(4)}]</div>
             </div>
           </Popup>
         </Marker>
 
         {/* Agent Live Marker */}
         {agentLocation && agentLocation.lat && agentLocation.lng && (
-          <Marker position={[agentLocation.lat, agentLocation.lng]} icon={agentIcon}>
+          <Marker position={[Number(agentLocation.lat), Number(agentLocation.lng)]} icon={agentIcon}>
             <Popup>
               <div className="text-slate-900 font-semibold text-xs">
                 <strong>Delivery Agent Location</strong>
+                <div className="text-[10px] text-slate-600 font-mono">Live GPS tracking</div>
               </div>
             </Popup>
           </Marker>
         )}
 
         {/* Route Line */}
-        <Polyline positions={positions} color="#0284c7" weight={4} dashArray="5, 10" />
+        <Polyline positions={[[pLat, pLng], [dLat, dLng]]} color="#0284c7" weight={4} dashArray="5, 10" />
       </MapContainer>
     </div>
   );

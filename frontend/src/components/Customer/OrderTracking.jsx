@@ -225,9 +225,9 @@ export default function OrderTracking({ orderId, onBack }) {
 
         {/* Map */}
         <TrackingMap
-          pickupLocation={{ lat: 37.7749, lng: -122.4194 }}
-          dropLocation={{ lat: 37.7833, lng: -122.4167 }}
-          agentLocation={agentLocation}
+          pickupLocation={order.pickupLocation || { lat: 37.7749, lng: -122.4194 }}
+          dropLocation={order.dropLocation || { lat: 37.7833, lng: -122.4167 }}
+          agentLocation={agentLocation || order.assignedAgent?.currentLocation}
         />
 
         {/* Info Grid */}

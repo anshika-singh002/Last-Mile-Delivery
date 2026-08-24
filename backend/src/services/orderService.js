@@ -32,16 +32,29 @@ class OrderService {
     const normalizedPaymentType = String(paymentType || '').toUpperCase();
     const orderId = `ord-${Date.now()}`;
 
+    const pickupZone = calculation.pickupZone;
+    const dropZone = calculation.dropZone;
+
+    const pickupLocation = pickupZone
+      ? { lat: pickupZone.centerLat, lng: pickupZone.centerLng }
+      : { lat: 37.7749, lng: -122.4194 };
+
+    const dropLocation = dropZone
+      ? { lat: dropZone.centerLat, lng: dropZone.centerLng }
+      : { lat: 37.7833, lng: -122.4167 };
+
     const newOrder = {
       id: orderId,
       customerId,
       customerName: customerName || 'Customer',
       pickupAddress,
       pickupPincode,
-      pickupZoneId: calculation.pickupZone ? calculation.pickupZone.id : null,
+      pickupZoneId: pickupZone ? pickupZone.id : null,
+      pickupLocation,
       dropAddress,
       dropPincode,
-      dropZoneId: calculation.dropZone ? calculation.dropZone.id : null,
+      dropZoneId: dropZone ? dropZone.id : null,
+      dropLocation,
       dimensions: {
         length: parseFloat(dimensions.length),
         width: parseFloat(dimensions.width),
@@ -114,10 +127,27 @@ class OrderService {
       ? memoryDb.users.find(u => u.id === order.assignedAgentId)
       : null;
 
+    const pickupZone = order.pickupZoneId
+      ? memoryDb.zones.find(z => z.id === order.pickupZoneId)
+      : null;
+    const dropZone = order.dropZoneId
+      ? memoryDb.zones.find(z => z.id === order.dropZoneId)
+      : null;
+
+    const pickupLocation = order.pickupLocation || (pickupZone
+      ? { lat: pickupZone.centerLat, lng: pickupZone.centerLng }
+      : { lat: 37.7749, lng: -122.4194 });
+
+    const dropLocation = order.dropLocation || (dropZone
+      ? { lat: dropZone.centerLat, lng: dropZone.centerLng }
+      : { lat: 37.7833, lng: -122.4167 });
+
     return {
       ...order,
+      pickupLocation,
+      dropLocation,
       trackingHistory,
-      assignedAgent: agent ? { id: agent.id, name: agent.name, phone: agent.phone } : null
+      assignedAgent: agent ? { id: agent.id, name: agent.name, phone: agent.phone, currentLocation: agent.currentLocation } : null
     };
   }
 
@@ -146,40 +176,43 @@ class OrderService {
     });
   }
 
-  async updateOrderStatus(orderId, { newStatus, actor, actorId, notes, location, reason }) {
+  async updateOrderStatus(orderId, { newStatus, status, actor, actorId, notes, location, reason }) {
+    const targetStatus = newStatus || status;
+    if (!targetStatus) throw new Error('Status is required');
+
     const order = memoryDb.orders.find(o => o.id === orderId);
     if (!order) throw new Error('Order not found');
 
     const prevStatus = order.status;
-    order.status = newStatus;
+    order.status = targetStatus;
     order.updatedAt = new Date().toISOString();
 
     const actorUser = memoryDb.users.find(u => u.id === actorId);
 
     this.addTrackingHistory({
       orderId,
-      status: newStatus,
+      status: targetStatus,
       previousStatus: prevStatus,
-      actor,
-      actorId,
-      actorName: actorUser ? actorUser.name : actor,
-      notes: notes || `Status updated from ${prevStatus} to ${newStatus}`,
+      actor: actor || 'AGENT',
+      actorId: actorId || 'system',
+      actorName: actorUser ? actorUser.name : (actor || 'Agent'),
+      notes: notes || `Status updated from ${prevStatus} to ${targetStatus}`,
       reason,
       location
     });
 
     const customer = memoryDb.users.find(u => u.id === order.customerId);
     if (customer) {
-      if (newStatus === ORDER_STATUS.FAILED) {
+      if (targetStatus === ORDER_STATUS.FAILED) {
         await notificationService.notifyFailedDelivery(customer, orderId, reason || notes);
       } else {
-        await notificationService.sendStatusEmail(customer.email, orderId, newStatus, notes);
-        await notificationService.sendStatusSMS(customer.phone, orderId, newStatus);
+        await notificationService.sendStatusEmail(customer.email, orderId, targetStatus, notes);
+        await notificationService.sendStatusSMS(customer.phone, orderId, targetStatus);
       }
     }
 
     // When an order is completed or failed, freeing up agent capacity, process queued pending orders
-    if (newStatus === ORDER_STATUS.DELIVERED || newStatus === ORDER_STATUS.FAILED) {
+    if (targetStatus === ORDER_STATUS.DELIVERED || targetStatus === ORDER_STATUS.FAILED) {
       assignmentService.processPendingQueue().catch(err => {
         console.error('Error processing pending queue after status update:', err);
       });
