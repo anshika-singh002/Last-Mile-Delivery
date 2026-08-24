@@ -42,12 +42,6 @@ A full-stack, enterprise-grade Last-Mile Delivery platform featuring a dynamic r
    - **SMS**: Live dispatch alerts powered by the Twilio SDK.
    - **WebSockets**: Instant real-time map location updates and alert broadcasts powered by Socket.io.
 
-## 🌐 Live Production Deployment
-
-- **Frontend (Vercel)**: [https://last-mile-delivery-omega.vercel.app](https://last-mile-delivery-omega.vercel.app)
-- **Backend API (Render)**: [https://last-mile-delivery-gep1.onrender.com](https://last-mile-delivery-gep1.onrender.com)
-- **WebSocket Gateway**: `wss://last-mile-delivery-gep1.onrender.com`
-
 ---
 
 ## 🚀 Setup & Installation Guide
