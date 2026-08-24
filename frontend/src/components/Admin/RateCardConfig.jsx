@@ -46,7 +46,9 @@ export default function RateCardConfig() {
     <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
       <div>
         <h2 className="text-xl font-bold text-white">Rate Card Configuration Engine</h2>
-        <p className="text-xs text-slate-400">Configure base rates, per-kg pricing, and COD surcharges dynamically ({currency.code})</p>
+        <p className="text-xs text-slate-400">
+          Configure base rates, per-kg pricing, and COD surcharges dynamically ({currency.code})
+        </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

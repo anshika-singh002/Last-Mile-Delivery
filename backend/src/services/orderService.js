@@ -114,7 +114,7 @@ class OrderService {
   }
 
   async getOrders(filters = {}) {
-    let result = [...memoryDb.orders];
+    let result = [...(memoryDb.orders || [])];
 
     if (filters.customerId) {
       result = result.filter(o => o.customerId === filters.customerId);
@@ -194,10 +194,9 @@ class OrderService {
 
     order.rescheduleDate = rescheduleDate;
     order.rescheduleReason = rescheduleReason;
-    order.status = ORDER_STATUS.ASSIGNED; // Reset to assigned for next attempt
+    order.status = ORDER_STATUS.ASSIGNED;
     order.updatedAt = new Date().toISOString();
 
-    // Reassign agent if current is unavailable or keep
     const pickupZone = memoryDb.zones.find(z => z.id === order.pickupZoneId);
     const newAgent = await assignmentService.autoAssignAgent(order, pickupZone);
     if (newAgent) {
@@ -217,7 +216,7 @@ class OrderService {
 
   addTrackingHistory({ orderId, status, actor, actorId, notes, location }) {
     const historyItem = {
-      id: `th-${Date.now()}-${Math.floor(Math.random()*1000)}`,
+      id: `th-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
       orderId,
       status,
       actor,

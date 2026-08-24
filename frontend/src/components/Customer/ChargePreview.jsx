@@ -1,5 +1,5 @@
 import React from 'react';
-import { Calculator, ShieldAlert, CheckCircle } from 'lucide-react';
+import { Calculator } from 'lucide-react';
 import { useCurrency } from '../../context/CurrencyContext';
 
 export default function ChargePreview({ previewData }) {
@@ -14,9 +14,7 @@ export default function ChargePreview({ previewData }) {
     weightCharge,
     codSurcharge,
     totalCharge,
-    isIntraZone,
-    pickupZone,
-    dropZone
+    isIntraZone
   } = previewData;
 
   const perKgConverted = weightCharge && billableWeight ? weightCharge / billableWeight : 0;
