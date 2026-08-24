@@ -22,6 +22,7 @@ class AuthService {
       phone: phone || '',
       address: address || '',
       isAvailable: true,
+      maxActiveDeliveries: 3,
       currentZoneId: null,
       currentLocation: null
     };

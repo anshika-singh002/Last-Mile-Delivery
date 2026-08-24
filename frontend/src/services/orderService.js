@@ -25,6 +25,10 @@ export const orderService = {
     const response = await api.post(`/orders/${id}/assign`, { agentId });
     return response.data;
   },
+  autoAssign: async (id) => {
+    const response = await api.post(`/orders/${id}/auto-assign`);
+    return response.data;
+  },
   rescheduleOrder: async (id, rescheduleData) => {
     const response = await api.post(`/orders/${id}/reschedule`, rescheduleData);
     return response.data;

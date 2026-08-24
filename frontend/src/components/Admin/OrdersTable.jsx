@@ -65,6 +65,23 @@ export default function OrdersTable() {
     }
   };
 
+  const handleAutoAssign = async (orderId) => {
+    try {
+      const res = await orderService.autoAssign(orderId);
+      if (res?.success) {
+        addToast(
+          `Auto-assigned to ${res.assignment?.agent?.name || 'agent'} (${res.assignment?.distanceKm} km away)`,
+          'success'
+        );
+        fetchData();
+      } else {
+        addToast(res?.message || 'Failed to auto-assign', 'error');
+      }
+    } catch (err) {
+      addToast(err.response?.data?.message || 'Auto-assignment failed: No eligible agents available', 'error');
+    }
+  };
+
   const handleOverrideStatus = async (orderId, newStatus) => {
     try {
       const res = await orderService.updateStatus(orderId, {
@@ -97,7 +114,7 @@ export default function OrdersTable() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-white">All Deliveries Management</h2>
-          <p className="text-xs text-slate-400">Filter by status/agent, manual assignment & admin overrides</p>
+          <p className="text-xs text-slate-400">Filter by status/agent, auto/manual assignment & admin overrides</p>
         </div>
 
         <div className="flex flex-wrap gap-2 text-xs">
@@ -107,7 +124,7 @@ export default function OrdersTable() {
             className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-sky-500"
           >
             <option value="">All Statuses</option>
-            <option value="CREATED">CREATED</option>
+            <option value="CREATED">CREATED (Pending/Unassigned)</option>
             <option value="ASSIGNED">ASSIGNED</option>
             <option value="PICKED_UP">PICKED_UP</option>
             <option value="IN_TRANSIT">IN_TRANSIT</option>
@@ -123,7 +140,9 @@ export default function OrdersTable() {
           >
             <option value="">All Agents</option>
             {agents.map((ag) => (
-              <option key={ag.id || ag._id} value={ag.id || ag._id}>{ag.name}</option>
+              <option key={ag.id || ag._id} value={ag.id || ag._id}>
+                {ag.name} {ag.isAvailable === false ? '(Offline)' : `(${ag.activeDeliveries || 0}/${ag.maxActiveDeliveries || 3})`}
+              </option>
             ))}
           </select>
         </div>
@@ -148,7 +167,7 @@ export default function OrdersTable() {
                 <th className="px-4 py-3">Type</th>
                 <th className="px-4 py-3">Charge</th>
                 <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Assigned Agent</th>
+                <th className="px-4 py-3">Assignment (Manual / Auto)</th>
                 <th className="px-4 py-3 rounded-r-xl">Override Action</th>
               </tr>
             </thead>
@@ -172,22 +191,37 @@ export default function OrdersTable() {
                     <span className={`px-2.5 py-1 rounded-full font-bold border text-[10px] ${
                       order.status === 'DELIVERED' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' :
                       order.status === 'FAILED' ? 'bg-rose-500/10 border-rose-500/30 text-rose-400' :
+                      order.status === 'CREATED' && !order.assignedAgentId ? 'bg-amber-500/10 border-amber-500/30 text-amber-400' :
                       'bg-sky-500/10 border-sky-500/30 text-sky-400'
                     }`}>
-                      {order.status || 'UNKNOWN'}
+                      {order.status === 'CREATED' && !order.assignedAgentId ? 'QUEUED (UNASSIGNED)' : (order.status || 'UNKNOWN')}
                     </span>
                   </td>
                   <td className="px-4 py-3.5">
-                    <select
-                      value={order.assignedAgentId || order.assignedAgent || ''}
-                      onChange={(e) => handleAssignAgent(order.id || order._id, e.target.value)}
-                      className="bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:border-sky-500"
-                    >
-                      <option value="">Unassigned</option>
-                      {agents.map((ag) => (
-                        <option key={ag.id || ag._id} value={ag.id || ag._id}>{ag.name}</option>
-                      ))}
-                    </select>
+                    <div className="flex items-center space-x-2">
+                      <select
+                        value={order.assignedAgentId || order.assignedAgent || ''}
+                        onChange={(e) => handleAssignAgent(order.id || order._id, e.target.value)}
+                        className="bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:border-sky-500"
+                      >
+                        <option value="">Unassigned</option>
+                        {agents.map((ag) => (
+                          <option key={ag.id || ag._id} value={ag.id || ag._id}>
+                            {ag.name} {ag.isAvailable === false ? '(Offline)' : `(${ag.activeDeliveries || 0}/${ag.maxActiveDeliveries || 3})`}
+                          </option>
+                        ))}
+                      </select>
+
+                      {(!order.assignedAgentId || order.status === 'CREATED') && (
+                        <button
+                          onClick={() => handleAutoAssign(order.id || order._id)}
+                          title="Trigger Nearest-Neighbor Auto-Assignment"
+                          className="px-2.5 py-1 rounded-lg bg-sky-600/20 hover:bg-sky-600 text-sky-400 hover:text-white border border-sky-500/30 text-[10px] font-bold transition whitespace-nowrap"
+                        >
+                          Auto-Assign
+                        </button>
+                      )}
+                    </div>
                   </td>
                   <td className="px-4 py-3.5">
                     <select

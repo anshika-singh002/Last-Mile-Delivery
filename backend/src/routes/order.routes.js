@@ -12,6 +12,7 @@ router.post('/', validateOrderCreation, orderController.createOrder);
 router.get('/:id', orderController.getOrderDetails);
 router.patch('/:id/status', orderController.updateStatus);
 router.post('/:id/assign', orderController.assignAgent);
+router.post('/:id/auto-assign', orderController.autoAssign);
 router.post('/:id/reschedule', orderController.reschedule);
 
 module.exports = router;

@@ -82,6 +82,18 @@ exports.assignAgent = async (req, res, next) => {
   }
 };
 
+exports.autoAssign = async (req, res, next) => {
+  try {
+    const result = await orderService.triggerAutoAssign(req.params.id);
+    if (!result.success) {
+      return res.status(400).json({ success: false, message: result.message, data: result.order });
+    }
+    res.json({ success: true, data: result.data, assignment: result.assignment });
+  } catch (err) {
+    next(err);
+  }
+};
+
 exports.reschedule = async (req, res, next) => {
   try {
     const updatedOrder = await orderService.rescheduleOrder(req.params.id, req.body);

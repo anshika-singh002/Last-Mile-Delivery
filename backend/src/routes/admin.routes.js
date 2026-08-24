@@ -29,6 +29,7 @@ router.get('/agents', agentController.getAllAgents);
 // Order Management & Override
 router.get('/orders', orderController.getAllOrders);
 router.post('/orders/:id/assign', orderController.assignAgent);
+router.post('/orders/:id/auto-assign', orderController.autoAssign);
 router.patch('/orders/:id/status', orderController.updateStatus);
 
 module.exports = router;

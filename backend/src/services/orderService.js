@@ -72,16 +72,25 @@ class OrderService {
     });
 
     if (autoAssign) {
-      const bestAgent = await assignmentService.autoAssignAgent(newOrder, calculation.pickupZone);
-      if (bestAgent) {
-        newOrder.assignedAgentId = bestAgent.id;
+      const assignment = await assignmentService.autoAssignAgent(newOrder, calculation.pickupZone);
+      if (assignment.success && assignment.agent) {
+        newOrder.assignedAgentId = assignment.agent.id;
         newOrder.status = ORDER_STATUS.ASSIGNED;
         this.addTrackingHistory({
           orderId,
           status: ORDER_STATUS.ASSIGNED,
           actor: 'SYSTEM',
           actorId: 'system',
-          notes: `Auto-assigned to agent ${bestAgent.name}`
+          notes: `Auto-assignment: ${assignment.reason}`
+        });
+      } else {
+        // Fallback when no agent is currently available or under capacity
+        this.addTrackingHistory({
+          orderId,
+          status: ORDER_STATUS.CREATED,
+          actor: 'SYSTEM',
+          actorId: 'system',
+          notes: `Auto-assignment fallback: ${assignment.reason || 'No available agents'}. Queued for auto-assignment.`
         });
       }
     }
@@ -161,6 +170,13 @@ class OrderService {
       notificationService.sendStatusSMS(customer.phone, orderId, newStatus);
     }
 
+    // When an order is completed or failed, freeing up agent capacity, process queued pending orders
+    if (newStatus === ORDER_STATUS.DELIVERED || newStatus === ORDER_STATUS.FAILED) {
+      assignmentService.processPendingQueue().catch(err => {
+        console.error('Error processing pending queue after status update:', err);
+      });
+    }
+
     return order;
   }
 
@@ -182,10 +198,53 @@ class OrderService {
       status: order.status,
       actor,
       actorId,
-      notes: `Order assigned to agent ${agent.name}`
+      notes: `Order manually assigned to agent ${agent.name}`
     });
 
     return order;
+  }
+
+  async triggerAutoAssign(orderId) {
+    const order = memoryDb.orders.find(o => o.id === orderId);
+    if (!order) throw new Error('Order not found');
+
+    const pickupZone = memoryDb.zones.find(z => z.id === order.pickupZoneId);
+    const assignment = await assignmentService.autoAssignAgent(order, pickupZone);
+
+    if (!assignment.success || !assignment.agent) {
+      this.addTrackingHistory({
+        orderId,
+        status: order.status,
+        actor: 'SYSTEM',
+        actorId: 'system',
+        notes: `Auto-assignment attempted: ${assignment.reason}`
+      });
+      return {
+        success: false,
+        message: assignment.reason,
+        order
+      };
+    }
+
+    order.assignedAgentId = assignment.agent.id;
+    if (order.status === ORDER_STATUS.CREATED) {
+      order.status = ORDER_STATUS.ASSIGNED;
+    }
+    order.updatedAt = new Date().toISOString();
+
+    this.addTrackingHistory({
+      orderId,
+      status: order.status,
+      actor: 'SYSTEM',
+      actorId: 'system',
+      notes: `Auto-assignment: ${assignment.reason}`
+    });
+
+    return {
+      success: true,
+      data: order,
+      assignment
+    };
   }
 
   async rescheduleOrder(orderId, { rescheduleDate, rescheduleReason }) {
@@ -194,22 +253,32 @@ class OrderService {
 
     order.rescheduleDate = rescheduleDate;
     order.rescheduleReason = rescheduleReason;
-    order.status = ORDER_STATUS.ASSIGNED;
     order.updatedAt = new Date().toISOString();
 
     const pickupZone = memoryDb.zones.find(z => z.id === order.pickupZoneId);
-    const newAgent = await assignmentService.autoAssignAgent(order, pickupZone);
-    if (newAgent) {
-      order.assignedAgentId = newAgent.id;
-    }
+    const assignment = await assignmentService.autoAssignAgent(order, pickupZone);
 
-    this.addTrackingHistory({
-      orderId,
-      status: ORDER_STATUS.ASSIGNED,
-      actor: 'CUSTOMER',
-      actorId: order.customerId,
-      notes: `Rescheduled for ${rescheduleDate}. Reason: ${rescheduleReason}`
-    });
+    if (assignment.success && assignment.agent) {
+      order.assignedAgentId = assignment.agent.id;
+      order.status = ORDER_STATUS.ASSIGNED;
+      this.addTrackingHistory({
+        orderId,
+        status: ORDER_STATUS.ASSIGNED,
+        actor: 'CUSTOMER',
+        actorId: order.customerId,
+        notes: `Rescheduled for ${rescheduleDate}. Reason: ${rescheduleReason}. Auto-assigned: ${assignment.reason}`
+      });
+    } else {
+      order.assignedAgentId = null;
+      order.status = ORDER_STATUS.CREATED;
+      this.addTrackingHistory({
+        orderId,
+        status: ORDER_STATUS.CREATED,
+        actor: 'CUSTOMER',
+        actorId: order.customerId,
+        notes: `Rescheduled for ${rescheduleDate}. Reason: ${rescheduleReason}. Fallback: ${assignment.reason}. Queued for assignment.`
+      });
+    }
 
     return order;
   }

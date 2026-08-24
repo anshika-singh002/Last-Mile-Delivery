@@ -21,6 +21,7 @@ const memoryDb = {
       role: USER_ROLES.AGENT,
       phone: '+1 555-0211',
       isAvailable: true,
+      maxActiveDeliveries: 3,
       currentZoneId: 'zone-1',
       currentLocation: { lat: 37.7749, lng: -122.4194 }
     },
@@ -32,6 +33,7 @@ const memoryDb = {
       role: USER_ROLES.AGENT,
       phone: '+1 555-0322',
       isAvailable: true,
+      maxActiveDeliveries: 3,
       currentZoneId: 'zone-2',
       currentLocation: { lat: 37.7833, lng: -122.4167 }
     },
