@@ -62,8 +62,45 @@ export default function AssignedOrders({ onSelectOrder }) {
     }
   };
 
+  const [simulatingOrderId, setSimulatingOrderId] = useState(null);
+
+  const handleSimulateLiveLocation = (order) => {
+    if (!order) return;
+    setSimulatingOrderId(order.id);
+    socketService.connect();
+
+    const pLat = Number(order.pickupLocation?.lat) || 28.6333;
+    const pLng = Number(order.pickupLocation?.lng) || 77.2167;
+    const dLat = Number(order.dropLocation?.lat) || 28.7041;
+    const dLng = Number(order.dropLocation?.lng) || 77.1025;
+
+    let step = 0;
+    const totalSteps = 10;
+    addToast(`Broadcasting live GPS location for Order #${order.id}...`, 'info');
+
+    const interval = setInterval(() => {
+      step += 1;
+      const progress = step / totalSteps;
+      const curLat = pLat + (dLat - pLat) * progress;
+      const curLng = pLng + (dLng - pLng) * progress;
+
+      socketService.sendLocationUpdate({
+        orderId: order.id,
+        lat: curLat,
+        lng: curLng
+      });
+
+      if (step >= totalSteps) {
+        clearInterval(interval);
+        setSimulatingOrderId(null);
+        addToast(`Agent reached destination for Order #${order.id}!`, 'success');
+      }
+    }, 2000);
+  };
+
   const handleUpdateStatus = async (orderId, newStatus) => {
     try {
+      const order = orders.find(o => o.id === orderId);
       const res = await orderService.updateStatus(orderId, {
         status: newStatus,
         notes: `Agent updated status to ${newStatus}`
@@ -71,11 +108,27 @@ export default function AssignedOrders({ onSelectOrder }) {
       if (res.success) {
         addToast(`Order #${orderId} marked as ${newStatus}`, 'success');
         socketService.connect();
-        socketService.sendLocationUpdate({
-          orderId,
-          lat: 37.7749 + Math.random() * 0.01,
-          lng: -122.4194 + Math.random() * 0.01
-        });
+
+        // Broadcast current location along route based on status
+        if (order) {
+          const pLat = Number(order.pickupLocation?.lat) || 28.6333;
+          const pLng = Number(order.pickupLocation?.lng) || 77.2167;
+          const dLat = Number(order.dropLocation?.lat) || 28.7041;
+          const dLng = Number(order.dropLocation?.lng) || 77.1025;
+
+          let factor = 0.1;
+          if (newStatus === 'PICKED_UP') factor = 0.2;
+          if (newStatus === 'IN_TRANSIT') factor = 0.5;
+          if (newStatus === 'OUT_FOR_DELIVERY') factor = 0.85;
+          if (newStatus === 'DELIVERED') factor = 1.0;
+
+          socketService.sendLocationUpdate({
+            orderId,
+            lat: pLat + (dLat - pLat) * factor,
+            lng: pLng + (dLng - pLng) * factor
+          });
+        }
+
         fetchProfileAndOrders();
       }
     } catch (err) {
@@ -210,38 +263,49 @@ export default function AssignedOrders({ onSelectOrder }) {
                 </div>
 
                 {/* Quick Status Action Buttons */}
-                <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-900">
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-900">
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => handleUpdateStatus(order.id, 'PICKED_UP')}
+                      className="px-3 py-1.5 bg-sky-500/10 border border-sky-500/20 hover:bg-sky-500/20 text-sky-400 font-semibold text-xs rounded-lg transition"
+                    >
+                      Mark Picked Up
+                    </button>
+                    <button
+                      onClick={() => handleUpdateStatus(order.id, 'IN_TRANSIT')}
+                      className="px-3 py-1.5 bg-indigo-500/10 border border-indigo-500/20 hover:bg-indigo-500/20 text-indigo-400 font-semibold text-xs rounded-lg transition"
+                    >
+                      In Transit
+                    </button>
+                    <button
+                      onClick={() => handleUpdateStatus(order.id, 'OUT_FOR_DELIVERY')}
+                      className="px-3 py-1.5 bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/20 text-amber-400 font-semibold text-xs rounded-lg transition"
+                    >
+                      Out for Delivery
+                    </button>
+                    <button
+                      onClick={() => handleUpdateStatus(order.id, 'DELIVERED')}
+                      className="px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/20 text-emerald-400 font-semibold text-xs rounded-lg transition flex items-center space-x-1"
+                    >
+                      <CheckCircle className="w-3.5 h-3.5" />
+                      <span>Delivered</span>
+                    </button>
+                    <button
+                      onClick={() => handleUpdateStatus(order.id, 'FAILED')}
+                      className="px-3 py-1.5 bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500/20 text-rose-400 font-semibold text-xs rounded-lg transition flex items-center space-x-1"
+                    >
+                      <XCircle className="w-3.5 h-3.5" />
+                      <span>Delivery Failed</span>
+                    </button>
+                  </div>
+
                   <button
-                    onClick={() => handleUpdateStatus(order.id, 'PICKED_UP')}
-                    className="px-3 py-1.5 bg-sky-500/10 border border-sky-500/20 hover:bg-sky-500/20 text-sky-400 font-semibold text-xs rounded-lg transition"
+                    onClick={() => handleSimulateLiveLocation(order)}
+                    disabled={simulatingOrderId === order.id}
+                    className="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white font-bold text-xs rounded-lg transition flex items-center space-x-1 shadow-md"
                   >
-                    Mark Picked Up
-                  </button>
-                  <button
-                    onClick={() => handleUpdateStatus(order.id, 'IN_TRANSIT')}
-                    className="px-3 py-1.5 bg-indigo-500/10 border border-indigo-500/20 hover:bg-indigo-500/20 text-indigo-400 font-semibold text-xs rounded-lg transition"
-                  >
-                    In Transit
-                  </button>
-                  <button
-                    onClick={() => handleUpdateStatus(order.id, 'OUT_FOR_DELIVERY')}
-                    className="px-3 py-1.5 bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/20 text-amber-400 font-semibold text-xs rounded-lg transition"
-                  >
-                    Out for Delivery
-                  </button>
-                  <button
-                    onClick={() => handleUpdateStatus(order.id, 'DELIVERED')}
-                    className="px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/20 text-emerald-400 font-semibold text-xs rounded-lg transition flex items-center space-x-1"
-                  >
-                    <CheckCircle className="w-3.5 h-3.5" />
-                    <span>Delivered</span>
-                  </button>
-                  <button
-                    onClick={() => handleUpdateStatus(order.id, 'FAILED')}
-                    className="px-3 py-1.5 bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500/20 text-rose-400 font-semibold text-xs rounded-lg transition flex items-center space-x-1"
-                  >
-                    <XCircle className="w-3.5 h-3.5" />
-                    <span>Delivery Failed</span>
+                    <Truck className="w-3.5 h-3.5 animate-pulse" />
+                    <span>{simulatingOrderId === order.id ? 'Broadcasting GPS...' : '📡 Broadcast Live GPS Movement'}</span>
                   </button>
                 </div>
               </div>
