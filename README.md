@@ -8,7 +8,7 @@ A full-stack, enterprise-grade Last-Mile Delivery platform featuring a dynamic r
 
 - 🚀 **Live Web Application (Vercel)**: [https://last-mile-delivery-omega.vercel.app](https://last-mile-delivery-omega.vercel.app)
 - ⚙️ **Live Backend API (Render)**: [https://last-mile-delivery-gep1.onrender.com](https://last-mile-delivery-gep1.onrender.com)
-- 📡 **Live WebSocket Server**: `wss://last-mile-delivery-gep1.onrender.com`
+- 📡 **Live Real-time Socket.io Gateway**: Integrated seamlessly with the Backend API (powers live tracking map & instant alerts)
 
 ---
 
