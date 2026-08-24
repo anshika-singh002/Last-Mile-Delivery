@@ -3,6 +3,7 @@ const { Server } = require('socket.io');
 const app = require('./src/app');
 const { PORT, CLIENT_URL } = require('./src/config/env');
 const setupSocket = require('./src/socket/socketHandler');
+const notificationService = require('./src/services/notificationService');
 
 const server = http.createServer(app);
 
@@ -14,6 +15,7 @@ const io = new Server(server, {
 });
 
 setupSocket(io);
+notificationService.setSocketIO(io);
 
 // Entry point
 server.listen(PORT, () => {

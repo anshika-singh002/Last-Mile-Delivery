@@ -170,8 +170,12 @@ class OrderService {
 
     const customer = memoryDb.users.find(u => u.id === order.customerId);
     if (customer) {
-      notificationService.sendStatusEmail(customer.email, orderId, newStatus, notes);
-      notificationService.sendStatusSMS(customer.phone, orderId, newStatus);
+      if (newStatus === ORDER_STATUS.FAILED) {
+        notificationService.notifyFailedDelivery(customer, orderId, reason || notes);
+      } else {
+        notificationService.sendStatusEmail(customer.email, orderId, newStatus, notes);
+        notificationService.sendStatusSMS(customer.phone, orderId, newStatus);
+      }
     }
 
     // When an order is completed or failed, freeing up agent capacity, process queued pending orders
@@ -270,15 +274,23 @@ class OrderService {
     const order = memoryDb.orders.find(o => o.id === orderId);
     if (!order) throw new Error('Order not found');
 
+    if (!rescheduleDate) {
+      throw new Error('Reschedule date is required');
+    }
+
     const prevStatus = order.status;
     order.rescheduleDate = rescheduleDate;
-    order.rescheduleReason = rescheduleReason;
+    order.rescheduleReason = rescheduleReason || 'Customer requested reschedule';
     order.updatedAt = new Date().toISOString();
 
+    // Trigger fresh auto-assignment cycle to find an available active agent
     const pickupZone = memoryDb.zones.find(z => z.id === order.pickupZoneId);
     const assignment = await assignmentService.autoAssignAgent(order, pickupZone);
 
+    let assignedAgent = null;
+
     if (assignment.success && assignment.agent) {
+      assignedAgent = assignment.agent;
       order.assignedAgentId = assignment.agent.id;
       order.status = ORDER_STATUS.ASSIGNED;
       this.addTrackingHistory({
@@ -288,9 +300,9 @@ class OrderService {
         actor: 'CUSTOMER',
         actorId: order.customerId,
         actorName: order.customerName,
-        notes: `Rescheduled for ${rescheduleDate}. Reason: ${rescheduleReason}. Auto-assigned: ${assignment.reason}`,
-        reason: rescheduleReason,
-        metadata: { rescheduleDate, assignedAgentId: assignment.agent.id }
+        notes: `Rescheduled for ${rescheduleDate}. Reason: ${order.rescheduleReason}. Auto-assigned: ${assignment.reason}`,
+        reason: order.rescheduleReason,
+        metadata: { rescheduleDate, assignedAgentId: assignment.agent.id, assignedAgentName: assignment.agent.name }
       });
     } else {
       order.assignedAgentId = null;
@@ -302,10 +314,16 @@ class OrderService {
         actor: 'CUSTOMER',
         actorId: order.customerId,
         actorName: order.customerName,
-        notes: `Rescheduled for ${rescheduleDate}. Reason: ${rescheduleReason}. Fallback: ${assignment.reason}. Queued for assignment.`,
-        reason: rescheduleReason,
+        notes: `Rescheduled for ${rescheduleDate}. Reason: ${order.rescheduleReason}. Fallback: ${assignment.reason}. Queued for auto-assignment.`,
+        reason: order.rescheduleReason,
         metadata: { rescheduleDate }
       });
+    }
+
+    // Notify customer about reschedule confirmation and newly assigned agent
+    const customer = memoryDb.users.find(u => u.id === order.customerId);
+    if (customer) {
+      notificationService.notifyRescheduled(customer, orderId, rescheduleDate, assignedAgent);
     }
 
     return order;

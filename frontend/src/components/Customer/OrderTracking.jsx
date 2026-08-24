@@ -97,6 +97,48 @@ export default function OrderTracking({ orderId, onBack }) {
           )}
         </div>
 
+        {/* Failed Delivery Action Banner */}
+        {order.status === 'FAILED' && (
+          <div className="bg-rose-500/10 border border-rose-500/30 rounded-2xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-start space-x-3.5">
+              <div className="p-2.5 rounded-xl bg-rose-500/20 text-rose-400 shrink-0 mt-0.5">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div className="space-y-1">
+                <h4 className="text-sm font-bold text-white">Delivery Attempt Unsuccessful</h4>
+                <p className="text-xs text-rose-300/90 leading-relaxed">
+                  The delivery partner was unable to complete the drop-off. Please select a new convenient date and delivery instructions to reassign an agent.
+                </p>
+                {order.rescheduleDate && (
+                  <p className="text-[11px] text-amber-300 font-semibold">
+                    Last Rescheduled Date: {order.rescheduleDate}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <button
+              onClick={() => setShowReschedule(true)}
+              className="px-5 py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-rose-600/30 transition whitespace-nowrap self-start md:self-auto flex items-center space-x-2"
+            >
+              <span>Reschedule Delivery Now</span>
+            </button>
+          </div>
+        )}
+
+        {/* Rescheduled Confirmation Banner */}
+        {order.rescheduleDate && order.status === 'ASSIGNED' && (
+          <div className="bg-sky-500/10 border border-sky-500/30 rounded-2xl p-4 flex items-center space-x-3 text-xs">
+            <CheckCircle className="w-5 h-5 text-sky-400 shrink-0" />
+            <div>
+              <span className="text-white font-bold block">Delivery Rescheduled for {order.rescheduleDate}</span>
+              <span className="text-slate-400">
+                Auto-assigned to {order.assignedAgent?.name || 'delivery agent'}. Reason: {order.rescheduleReason || 'Customer requested'}
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* Map */}
         <TrackingMap
           pickupLocation={{ lat: 37.7749, lng: -122.4194 }}
