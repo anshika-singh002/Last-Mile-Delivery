@@ -1,5 +1,6 @@
 const { memoryDb } = require('../config/database');
 const { calculateHaversineDistance } = require('../utils/haversine');
+const { geocodePincode } = require('../utils/geocoder');
 
 class ZoneService {
   async getAllZones() {
@@ -29,13 +30,25 @@ class ZoneService {
           .map(p => p.trim())
           .filter(Boolean);
 
+    let finalLat = centerLat != null && centerLat !== '' ? parseFloat(centerLat) : null;
+    let finalLng = centerLng != null && centerLng !== '' ? parseFloat(centerLng) : null;
+
+    // Auto-detect coordinates from the first pincode if not explicitly provided
+    if ((finalLat == null || finalLng == null) && normalizedPincodes.length > 0) {
+      const geo = await geocodePincode(normalizedPincodes[0]);
+      if (geo) {
+        finalLat = geo.lat;
+        finalLng = geo.lng;
+      }
+    }
+
     const newZone = {
       id: `zone-${Date.now()}`,
       name,
       code: String(code || '').toUpperCase(),
       pincodes: normalizedPincodes,
-      centerLat: parseFloat(centerLat) || 37.7749,
-      centerLng: parseFloat(centerLng) || -122.4194
+      centerLat: finalLat != null ? finalLat : 28.6139,
+      centerLng: finalLng != null ? finalLng : 77.2090
     };
 
     memoryDb.zones.push(newZone);

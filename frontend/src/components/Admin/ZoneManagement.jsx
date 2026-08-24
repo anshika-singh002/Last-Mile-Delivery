@@ -14,9 +14,10 @@ export default function ZoneManagement() {
     name: '',
     code: '',
     pincodes: '',
-    centerLat: '37.7749',
-    centerLng: '-122.4194'
+    centerLat: '',
+    centerLng: ''
   });
+  const [detectingCoords, setDetectingCoords] = useState(false);
 
   const fetchZones = async () => {
     try {
@@ -39,6 +40,69 @@ export default function ZoneManagement() {
     fetchZones();
   }, []);
 
+  const handleAutoDetectCoords = async (pinToQuery) => {
+    const pin = (pinToQuery || newZone.pincodes.split(',')[0] || '').trim();
+    if (!pin) {
+      addToast('Please enter a pincode first to auto-detect coordinates', 'info');
+      return;
+    }
+    setDetectingCoords(true);
+    try {
+      let lat = null;
+      let lng = null;
+      // Try Zippopotam India
+      try {
+        const r = await fetch(`https://api.zippopotam.us/in/${pin}`);
+        if (r.ok) {
+          const d = await r.json();
+          lat = d.places[0].latitude;
+          lng = d.places[0].longitude;
+        }
+      } catch (e) {}
+
+      // Try Zippopotam US
+      if (!lat) {
+        try {
+          const r = await fetch(`https://api.zippopotam.us/us/${pin}`);
+          if (r.ok) {
+            const d = await r.json();
+            lat = d.places[0].latitude;
+            lng = d.places[0].longitude;
+          }
+        } catch (e) {}
+      }
+
+      // Try Nominatim OSM
+      if (!lat) {
+        try {
+          const r = await fetch(`https://nominatim.openstreetmap.org/search?postalcode=${encodeURIComponent(pin)}&format=json&limit=1`);
+          if (r.ok) {
+            const d = await r.json();
+            if (d && d[0]) {
+              lat = d[0].lat;
+              lng = d[0].lon;
+            }
+          }
+        } catch (e) {}
+      }
+
+      if (lat && lng) {
+        setNewZone(prev => ({
+          ...prev,
+          centerLat: String(parseFloat(lat).toFixed(6)),
+          centerLng: String(parseFloat(lng).toFixed(6))
+        }));
+        addToast(`Auto-detected coordinates for Pincode ${pin}!`, 'success');
+      } else {
+        addToast(`Could not auto-find coordinates for ${pin}. You can enter lat/lng manually.`, 'info');
+      }
+    } catch (err) {
+      addToast('Failed to auto-detect coordinates', 'error');
+    } finally {
+      setDetectingCoords(false);
+    }
+  };
+
   const handleCreateZone = async (e) => {
     e.preventDefault();
     setCreating(true);
@@ -49,18 +113,20 @@ export default function ZoneManagement() {
         pincodes: String(newZone.pincodes || '')
           .split(',')
           .map(p => p.trim())
-          .filter(Boolean)
+          .filter(Boolean),
+        centerLat: newZone.centerLat ? parseFloat(newZone.centerLat) : undefined,
+        centerLng: newZone.centerLng ? parseFloat(newZone.centerLng) : undefined
       };
 
       const res = await adminService.createZone(payload);
       if (res.success) {
-        addToast(`Zone ${res.data.name} created!`, 'success');
+        addToast(`Zone ${res.data.name} created with center [${res.data.centerLat}, ${res.data.centerLng}]!`, 'success');
         setNewZone({
           name: '',
           code: '',
           pincodes: '',
-          centerLat: '37.7749',
-          centerLng: '-122.4194'
+          centerLat: '',
+          centerLng: ''
         });
         fetchZones();
       } else {
@@ -153,20 +219,40 @@ export default function ZoneManagement() {
 
           <div className="grid grid-cols-1 gap-3 text-xs">
             <div>
-              <label className="block text-slate-400 mb-1">Assigned Pincodes (comma-separated)</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-slate-400">Assigned Pincodes (comma-separated)</label>
+                <button
+                  type="button"
+                  onClick={() => handleAutoDetectCoords()}
+                  disabled={detectingCoords}
+                  className="text-[11px] font-bold text-sky-400 hover:text-sky-300 transition underline flex items-center space-x-1"
+                >
+                  <span>{detectingCoords ? 'Detecting GPS...' : '📍 Auto-detect GPS from Pincode'}</span>
+                </button>
+              </div>
               <input
                 type="text"
                 required
-                placeholder="94102, 94103, 94104"
+                placeholder="e.g. 560001, 110001, 400001 or 94102"
                 value={newZone.pincodes}
-                onChange={(e) => setNewZone({ ...newZone, pincodes: e.target.value })}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setNewZone({ ...newZone, pincodes: val });
+                  const firstPin = val.split(',')[0].trim();
+                  if (firstPin.length >= 5 && (!newZone.centerLat || !newZone.centerLng)) {
+                    handleAutoDetectCoords(firstPin);
+                  }
+                }}
                 className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-sky-500"
               />
+              <p className="text-[10px] text-slate-500 mt-1">
+                Entering an Indian (6-digit) or global pincode will automatically locate the exact latitude & longitude on the map.
+              </p>
             </div>
 
             <button
               type="submit"
-              disabled={creating}
+              disabled={creating || detectingCoords}
               className="px-4 py-2 bg-sky-600 hover:bg-sky-500 disabled:opacity-60 text-white font-bold text-xs rounded-lg transition"
             >
               {creating ? 'Creating...' : 'Create Zone'}

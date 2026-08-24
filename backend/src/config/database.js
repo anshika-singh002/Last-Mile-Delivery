@@ -49,27 +49,27 @@ const memoryDb = {
   zones: [
     {
       id: 'zone-1',
-      name: 'Downtown (Zone Alpha)',
+      name: 'Delhi Central (Zone Alpha)',
       code: 'ALPHA',
-      pincodes: ['10001', '10002', '10003', '94102', '94103'],
-      centerLat: 37.7749,
-      centerLng: -122.4194
+      pincodes: ['110001', '110002', '110003', '94102', '94103'],
+      centerLat: 28.6333,
+      centerLng: 77.2167
     },
     {
       id: 'zone-2',
-      name: 'Uptown (Zone Beta)',
+      name: 'Bengaluru Tech Corridor (Zone Beta)',
       code: 'BETA',
-      pincodes: ['10004', '10005', '94104', '94105'],
-      centerLat: 37.7833,
-      centerLng: -122.4167
+      pincodes: ['560001', '560034', '560066', '560100', '94104', '94105'],
+      centerLat: 12.9716,
+      centerLng: 77.5946
     },
     {
       id: 'zone-3',
-      name: 'Suburbs (Zone Gamma)',
+      name: 'Mumbai Metro (Zone Gamma)',
       code: 'GAMMA',
-      pincodes: ['10006', '10007', '94106', '94107'],
-      centerLat: 37.7900,
-      centerLng: -122.4000
+      pincodes: ['400001', '400050', '400076', '10001', '94106', '94107'],
+      centerLat: 18.9322,
+      centerLng: 72.8347
     }
   ],
   rateCards: [

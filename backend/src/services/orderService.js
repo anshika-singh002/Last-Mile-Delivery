@@ -5,6 +5,8 @@ const rateService = require('./rateService');
 const assignmentService = require('./assignmentService');
 const notificationService = require('./notificationService');
 
+const { geocodePincode } = require('../utils/geocoder');
+
 class OrderService {
   async createOrder({
     customerId,
@@ -28,20 +30,37 @@ class OrderService {
       paymentType
     });
 
-    const normalizedOrderType = String(orderType || '').toUpperCase();
+    const normalizedOrderType = String(orderType || 'B2C').toUpperCase();
     const normalizedPaymentType = String(paymentType || '').toUpperCase();
     const orderId = `ord-${Date.now()}`;
 
     const pickupZone = calculation.pickupZone;
     const dropZone = calculation.dropZone;
 
-    const pickupLocation = pickupZone
-      ? { lat: pickupZone.centerLat, lng: pickupZone.centerLng }
-      : { lat: 37.7749, lng: -122.4194 };
+    // 1. Resolve exact coordinates via geocoder or zone fallback
+    let pickupLocation = null;
+    let dropLocation = null;
 
-    const dropLocation = dropZone
-      ? { lat: dropZone.centerLat, lng: dropZone.centerLng }
-      : { lat: 37.7833, lng: -122.4167 };
+    const [pickupGeo, dropGeo] = await Promise.all([
+      geocodePincode(pickupPincode),
+      geocodePincode(dropPincode)
+    ]);
+
+    if (pickupGeo) {
+      pickupLocation = { lat: pickupGeo.lat, lng: pickupGeo.lng };
+    } else if (pickupZone) {
+      pickupLocation = { lat: pickupZone.centerLat, lng: pickupZone.centerLng };
+    } else {
+      pickupLocation = { lat: 28.6139, lng: 77.2090 };
+    }
+
+    if (dropGeo) {
+      dropLocation = { lat: dropGeo.lat, lng: dropGeo.lng };
+    } else if (dropZone) {
+      dropLocation = { lat: dropZone.centerLat, lng: dropZone.centerLng };
+    } else {
+      dropLocation = { lat: 28.7041, lng: 77.1025 };
+    }
 
     const newOrder = {
       id: orderId,
@@ -134,13 +153,26 @@ class OrderService {
       ? memoryDb.zones.find(z => z.id === order.dropZoneId)
       : null;
 
-    const pickupLocation = order.pickupLocation || (pickupZone
-      ? { lat: pickupZone.centerLat, lng: pickupZone.centerLng }
-      : { lat: 37.7749, lng: -122.4194 });
+    let pickupLocation = order.pickupLocation;
+    let dropLocation = order.dropLocation;
 
-    const dropLocation = order.dropLocation || (dropZone
-      ? { lat: dropZone.centerLat, lng: dropZone.centerLng }
-      : { lat: 37.7833, lng: -122.4167 });
+    if (!pickupLocation) {
+      if (pickupZone) {
+        pickupLocation = { lat: pickupZone.centerLat, lng: pickupZone.centerLng };
+      } else {
+        const geo = await geocodePincode(order.pickupPincode);
+        pickupLocation = geo ? { lat: geo.lat, lng: geo.lng } : { lat: 28.6139, lng: 77.2090 };
+      }
+    }
+
+    if (!dropLocation) {
+      if (dropZone) {
+        dropLocation = { lat: dropZone.centerLat, lng: dropZone.centerLng };
+      } else {
+        const geo = await geocodePincode(order.dropPincode);
+        dropLocation = geo ? { lat: geo.lat, lng: geo.lng } : { lat: 28.7041, lng: 77.1025 };
+      }
+    }
 
     return {
       ...order,
