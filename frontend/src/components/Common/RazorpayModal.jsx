@@ -27,7 +27,7 @@ export default function RazorpayModal({
       await new Promise(r => setTimeout(r, 1200));
 
       const mockPaymentId = `pay_${Math.random().toString(36).substring(2, 12)}`;
-      const mockOrderId = orderDetails.id || `order_${Math.random().toString(36).substring(2, 10)}`;
+      const mockOrderId = orderDetails.razorpayOrderId || `order_${Math.random().toString(36).substring(2, 10)}`;
 
       if (onSuccess) {
         onSuccess({
