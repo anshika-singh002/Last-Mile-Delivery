@@ -7,35 +7,42 @@ const notificationService = require('./notificationService');
 
 class PaymentService {
   constructor() {
-    this.keyId = process.env.RAZORPAY_KEY_ID || 'rzp_test_lastmile_demo';
-    this.keySecret = process.env.RAZORPAY_KEY_SECRET || 'rzp_secret_lastmile_demo';
+    // dynamically resolved on calls
+  }
 
-    this.isLiveCredentials =
-      this.keyId &&
-      this.keySecret &&
-      !this.keyId.includes('demo') &&
-      !this.keySecret.includes('demo') &&
-      this.keyId.startsWith('rzp_');
+  getCredentials() {
+    const keyId = process.env.RAZORPAY_KEY_ID || 'rzp_test_TU0KDWF36xoFv3';
+    const keySecret = process.env.RAZORPAY_KEY_SECRET || 'q0W6EJwT4HW80yVasvrgN3eV';
+    const isLive =
+      keyId &&
+      keySecret &&
+      !keyId.includes('demo') &&
+      !keySecret.includes('demo') &&
+      keyId.startsWith('rzp_');
 
-    if (this.isLiveCredentials) {
+    return { keyId, keySecret, isLive };
+  }
+
+  getInstance() {
+    const { keyId, keySecret, isLive } = this.getCredentials();
+    if (isLive) {
       try {
-        this.razorpayInstance = new Razorpay({
-          key_id: this.keyId,
-          key_secret: this.keySecret
+        return new Razorpay({
+          key_id: keyId,
+          key_secret: keySecret
         });
       } catch (err) {
-        console.warn('Failed to initialize Razorpay SDK instance, fallback to sandbox/test mode:', err.message);
-        this.razorpayInstance = null;
+        console.warn('Failed to initialize Razorpay SDK instance:', err.message);
       }
-    } else {
-      this.razorpayInstance = null;
     }
+    return null;
   }
 
   getPublicConfig() {
+    const { keyId, isLive } = this.getCredentials();
     return {
-      keyId: this.keyId,
-      isTestMode: !this.isLiveCredentials,
+      keyId,
+      isTestMode: !isLive,
       currency: 'INR'
     };
   }
@@ -50,12 +57,13 @@ class PaymentService {
     }
 
     const amountInPaise = Math.round(Number(amount) * 100);
-    const orderReceipt = receipt || `rcpt_${Date.now()}`;
+    const orderReceipt = (receipt || `rcpt_${Date.now()}`).substring(0, 40);
+    const rzp = this.getInstance();
 
     // If live credentials are provided and valid Razorpay SDK instance exists
-    if (this.razorpayInstance) {
+    if (rzp) {
       try {
-        const rzpOrder = await this.razorpayInstance.orders.create({
+        const rzpOrder = await rzp.orders.create({
           amount: amountInPaise,
           currency,
           receipt: orderReceipt,
@@ -74,7 +82,8 @@ class PaymentService {
           isMock: false
         };
       } catch (err) {
-        console.warn('Razorpay API error, falling back to mock test order:', err.message);
+        console.error('Razorpay API error creating order:', err);
+        throw new Error(err.error?.description || err.message || 'Failed to create Razorpay Order');
       }
     }
 
@@ -98,18 +107,19 @@ class PaymentService {
       return { verified: false, reason: 'Missing order ID or payment ID' };
     }
 
+    const { keySecret, isLive } = this.getCredentials();
+
     // Allow instant mock/sandbox verification for test runs or test credentials
     if (
       razorpay_signature === 'mock_signature_verified' ||
-      !this.isLiveCredentials ||
-      (razorpay_payment_id && razorpay_payment_id.startsWith('pay_'))
+      !isLive
     ) {
       return { verified: true, isMock: true };
     }
 
     const body = `${razorpay_order_id}|${razorpay_payment_id}`;
     const expectedSignature = crypto
-      .createHmac('sha256', this.keySecret)
+      .createHmac('sha256', keySecret)
       .update(body.toString())
       .digest('hex');
 

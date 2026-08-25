@@ -63,41 +63,29 @@ export default function CreateOrder({ onOrderCreated }) {
       if (res.success) {
         const createdOrder = res.data;
 
-        // If PREPAID, trigger Razorpay modal
+        // If PREPAID, directly trigger official Razorpay modal/checkout
         if (formData.paymentType === 'PREPAID') {
-          addToast(`Order #${createdOrder.id} created. Opening Razorpay Checkout...`, 'info');
+          addToast(`Order #${createdOrder.id} created. Opening Razorpay...`, 'info');
 
-          // Check if user has live keys or fallback to built-in interactive Razorpay modal
-          const config = await paymentService.getPaymentConfig().catch(() => null);
-          const hasLiveKey = config?.data?.keyId && !config.data.keyId.includes('demo') && typeof window.Razorpay !== 'undefined';
-
-          if (hasLiveKey) {
-            await paymentService.openRazorpayModal({
-              deliveryOrderId: createdOrder.id,
-              amount: createdOrder.totalCharge,
-              customerName: user?.name || 'Valued Customer',
-              customerEmail: user?.email || '',
-              customerPhone: user?.phone || '',
-              onSuccess: (pData) => {
-                addToast(`Payment successful! Receipt: ${pData.razorpayPaymentId}`, 'success');
-                if (onOrderCreated) onOrderCreated(pData.order || createdOrder);
-              },
-              onFailure: (err) => {
-                addToast('Payment cancelled or failed. You can retry anytime.', 'warning');
-                if (onOrderCreated) onOrderCreated(createdOrder);
-              },
-              onDismiss: () => {
-                addToast('Payment checkout dismissed', 'info');
-                if (onOrderCreated) onOrderCreated(createdOrder);
-              }
-            });
-          } else {
-            // Open built-in interactive test sandbox Razorpay modal
-            setPaymentModalState({
-              isOpen: true,
-              order: createdOrder
-            });
-          }
+          await paymentService.openRazorpayModal({
+            deliveryOrderId: createdOrder.id,
+            amount: createdOrder.totalCharge,
+            customerName: user?.name || 'Valued Customer',
+            customerEmail: user?.email || '',
+            customerPhone: user?.phone || '',
+            onSuccess: (pData) => {
+              addToast(`Payment successful! Receipt: ${pData.razorpayPaymentId || pData.razorpay_payment_id}`, 'success');
+              if (onOrderCreated) onOrderCreated(pData.order || createdOrder);
+            },
+            onFailure: (err) => {
+              addToast(`Payment cancelled or failed: ${err.message || 'Please try again'}`, 'error');
+              if (onOrderCreated) onOrderCreated(createdOrder);
+            },
+            onDismiss: () => {
+              addToast('Payment checkout dismissed', 'info');
+              if (onOrderCreated) onOrderCreated(createdOrder);
+            }
+          });
         } else {
           addToast(`Order ${createdOrder.id} placed successfully!`, 'success');
           if (onOrderCreated) onOrderCreated(createdOrder);
@@ -314,22 +302,6 @@ export default function CreateOrder({ onOrderCreated }) {
           </div>
         )}
       </form>
-
-      {paymentModalState.isOpen && paymentModalState.order && (
-        <RazorpayModal
-          isOpen={paymentModalState.isOpen}
-          orderDetails={{
-            deliveryOrderId: paymentModalState.order.id,
-            amount: paymentModalState.order.totalCharge
-          }}
-          onSuccess={handlePaymentSuccess}
-          onFailure={(err) => addToast(`Payment failed: ${err.message}`, 'error')}
-          onClose={() => {
-            setPaymentModalState({ isOpen: false, order: null });
-            if (onOrderCreated) onOrderCreated(paymentModalState.order);
-          }}
-        />
-      )}
     </div>
   );
 }

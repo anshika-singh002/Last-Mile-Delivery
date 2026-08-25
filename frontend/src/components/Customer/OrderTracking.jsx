@@ -70,47 +70,27 @@ export default function OrderTracking({ orderId, onBack }) {
     if (!order) return;
     setPaying(true);
     try {
-      const config = await paymentService.getPaymentConfig().catch(() => null);
-      const hasLiveKey = config?.data?.keyId && !config.data.keyId.includes('demo') && typeof window.Razorpay !== 'undefined';
-
-      if (hasLiveKey) {
-        await paymentService.openRazorpayModal({
-          deliveryOrderId: order.id,
-          amount: order.totalCharge,
-          customerName: user?.name || order.customerName,
-          customerEmail: user?.email || '',
-          customerPhone: user?.phone || '',
-          onSuccess: (paymentData) => {
-            addToast(`Payment successful! Receipt: ${paymentData.razorpayPaymentId}`, 'success');
-            fetchOrderDetails();
-          },
-          onFailure: (err) => {
-            addToast(`Payment cancelled or failed: ${err.message || 'Please try again'}`, 'error');
-          },
-          onDismiss: () => {
-            addToast('Payment checkout dismissed', 'info');
-          }
-        });
-      } else {
-        setShowPaymentModal(true);
-      }
+      await paymentService.openRazorpayModal({
+        deliveryOrderId: order.id,
+        amount: order.totalCharge,
+        customerName: user?.name || order.customerName,
+        customerEmail: user?.email || '',
+        customerPhone: user?.phone || '',
+        onSuccess: (paymentData) => {
+          addToast(`Payment successful! Receipt: ${paymentData.razorpayPaymentId || paymentData.razorpay_payment_id}`, 'success');
+          fetchOrderDetails();
+        },
+        onFailure: (err) => {
+          addToast(`Payment cancelled or failed: ${err.message || 'Please try again'}`, 'error');
+        },
+        onDismiss: () => {
+          addToast('Payment checkout dismissed', 'info');
+        }
+      });
     } catch (err) {
       addToast(err.message || 'Failed to initialize payment', 'error');
     } finally {
       setPaying(false);
-    }
-  };
-
-  const handleModalPaymentSuccess = async (paymentData) => {
-    try {
-      const verifyRes = await paymentService.verifyPayment(paymentData);
-      if (verifyRes.success) {
-        addToast(`Payment confirmed! Receipt: ${paymentData.razorpay_payment_id}`, 'success');
-        setShowPaymentModal(false);
-        fetchOrderDetails();
-      }
-    } catch (err) {
-      addToast(err.response?.data?.message || 'Failed to confirm payment', 'error');
     }
   };
 
@@ -420,19 +400,6 @@ export default function OrderTracking({ orderId, onBack }) {
           orderId={order.id}
           onClose={() => setShowReschedule(false)}
           onSuccess={() => fetchOrderDetails()}
-        />
-      )}
-
-      {showPaymentModal && (
-        <RazorpayModal
-          isOpen={showPaymentModal}
-          orderDetails={{
-            deliveryOrderId: order.id,
-            amount: order.totalCharge
-          }}
-          onSuccess={handleModalPaymentSuccess}
-          onFailure={(err) => addToast(`Payment failed: ${err.message}`, 'error')}
-          onClose={() => setShowPaymentModal(false)}
         />
       )}
     </div>
