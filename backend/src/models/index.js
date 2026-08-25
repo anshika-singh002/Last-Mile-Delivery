@@ -30,10 +30,18 @@ const PAYMENT_TYPES = {
   COD: 'COD'
 };
 
+const PAYMENT_STATUS = {
+  PENDING: 'PENDING',
+  PAID: 'PAID',
+  FAILED: 'FAILED',
+  REFUNDED: 'REFUNDED'
+};
+
 module.exports = {
   USER_ROLES,
   ORDER_STATUS,
   ORDER_TYPES,
   PAYMENT_TYPES,
+  PAYMENT_STATUS,
   TrackingHistory
 };

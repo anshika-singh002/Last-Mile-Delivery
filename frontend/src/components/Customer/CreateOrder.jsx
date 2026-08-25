@@ -1,10 +1,14 @@
 import React, { useState } from 'react';
-import { PackagePlus, MapPin, Box, DollarSign } from 'lucide-react';
+import { PackagePlus, MapPin, Box, DollarSign, CreditCard, ShieldCheck } from 'lucide-react';
 import { orderService } from '../../services/orderService';
+import { paymentService } from '../../services/paymentService';
 import { useNotification } from '../../context/NotificationContext';
+import { useAuth } from '../../context/AuthContext';
 import ChargePreview from './ChargePreview';
+import RazorpayModal from '../Common/RazorpayModal';
 
 export default function CreateOrder({ onOrderCreated }) {
+  const { user } = useAuth();
   const { addToast } = useNotification();
   const [formData, setFormData] = useState({
     pickupAddress: '123 Market St',
@@ -19,6 +23,10 @@ export default function CreateOrder({ onOrderCreated }) {
 
   const [previewData, setPreviewData] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [paymentModalState, setPaymentModalState] = useState({
+    isOpen: false,
+    order: null
+  });
 
   const handlePreview = async () => {
     try {
@@ -31,14 +39,69 @@ export default function CreateOrder({ onOrderCreated }) {
     }
   };
 
+  const handlePaymentSuccess = async (paymentData) => {
+    try {
+      const verifyRes = await paymentService.verifyPayment(paymentData);
+      if (verifyRes.success) {
+        addToast(`Payment confirmed! ID: ${paymentData.razorpay_payment_id}`, 'success');
+        setPaymentModalState({ isOpen: false, order: null });
+        if (onOrderCreated) {
+          onOrderCreated(verifyRes.data.order || paymentModalState.order);
+        }
+      }
+    } catch (err) {
+      addToast(err.response?.data?.message || 'Failed to verify payment', 'error');
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
+      // 1. Create Delivery Order in Backend
       const res = await orderService.createOrder(formData);
       if (res.success) {
-        addToast(`Order ${res.data.id} created successfully!`, 'success');
-        if (onOrderCreated) onOrderCreated(res.data);
+        const createdOrder = res.data;
+
+        // If PREPAID, trigger Razorpay modal
+        if (formData.paymentType === 'PREPAID') {
+          addToast(`Order #${createdOrder.id} created. Opening Razorpay Checkout...`, 'info');
+
+          // Check if user has live keys or fallback to built-in interactive Razorpay modal
+          const config = await paymentService.getPaymentConfig().catch(() => null);
+          const hasLiveKey = config?.data?.keyId && !config.data.keyId.includes('demo') && typeof window.Razorpay !== 'undefined';
+
+          if (hasLiveKey) {
+            await paymentService.openRazorpayModal({
+              deliveryOrderId: createdOrder.id,
+              amount: createdOrder.totalCharge,
+              customerName: user?.name || 'Valued Customer',
+              customerEmail: user?.email || '',
+              customerPhone: user?.phone || '',
+              onSuccess: (pData) => {
+                addToast(`Payment successful! Receipt: ${pData.razorpayPaymentId}`, 'success');
+                if (onOrderCreated) onOrderCreated(pData.order || createdOrder);
+              },
+              onFailure: (err) => {
+                addToast('Payment cancelled or failed. You can retry anytime.', 'warning');
+                if (onOrderCreated) onOrderCreated(createdOrder);
+              },
+              onDismiss: () => {
+                addToast('Payment checkout dismissed', 'info');
+                if (onOrderCreated) onOrderCreated(createdOrder);
+              }
+            });
+          } else {
+            // Open built-in interactive test sandbox Razorpay modal
+            setPaymentModalState({
+              isOpen: true,
+              order: createdOrder
+            });
+          }
+        } else {
+          addToast(`Order ${createdOrder.id} placed successfully!`, 'success');
+          if (onOrderCreated) onOrderCreated(createdOrder);
+        }
       }
     } catch (err) {
       addToast(err.response?.data?.message || 'Failed to create order', 'error');
@@ -228,11 +291,45 @@ export default function CreateOrder({ onOrderCreated }) {
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-sky-500/20 transition duration-200"
+          className={`w-full font-bold py-3.5 rounded-xl shadow-lg transition duration-200 flex items-center justify-center space-x-2 ${
+            formData.paymentType === 'PREPAID'
+              ? 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white shadow-emerald-500/20'
+              : 'bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white shadow-sky-500/20'
+          }`}
         >
-          {loading ? 'Creating Order...' : 'Confirm & Place Order'}
+          {formData.paymentType === 'PREPAID' ? (
+            <>
+              <CreditCard className="w-5 h-5" />
+              <span>{loading ? 'Initiating Razorpay...' : 'Pay with Razorpay & Place Order'}</span>
+            </>
+          ) : (
+            <span>{loading ? 'Creating Order...' : 'Confirm & Place Order (COD)'}</span>
+          )}
         </button>
+
+        {formData.paymentType === 'PREPAID' && (
+          <div className="flex items-center justify-center space-x-2 text-[11px] text-slate-400">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Secured by Razorpay • UPI, Cards, NetBanking, Wallets supported</span>
+          </div>
+        )}
       </form>
+
+      {paymentModalState.isOpen && paymentModalState.order && (
+        <RazorpayModal
+          isOpen={paymentModalState.isOpen}
+          orderDetails={{
+            deliveryOrderId: paymentModalState.order.id,
+            amount: paymentModalState.order.totalCharge
+          }}
+          onSuccess={handlePaymentSuccess}
+          onFailure={(err) => addToast(`Payment failed: ${err.message}`, 'error')}
+          onClose={() => {
+            setPaymentModalState({ isOpen: false, order: null });
+            if (onOrderCreated) onOrderCreated(paymentModalState.order);
+          }}
+        />
+      )}
     </div>
   );
 }

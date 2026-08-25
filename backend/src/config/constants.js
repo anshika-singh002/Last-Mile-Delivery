@@ -21,5 +21,11 @@ module.exports = {
     PREPAID: 'PREPAID',
     COD: 'COD'
   },
+  PAYMENT_STATUS: {
+    PENDING: 'PENDING',
+    PAID: 'PAID',
+    FAILED: 'FAILED',
+    REFUNDED: 'REFUNDED'
+  },
   VOLUMETRIC_DIVISOR: 5000
 };

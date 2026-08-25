@@ -102,6 +102,15 @@ export default function OrderList({ onSelectOrder }) {
 
                 <div className="flex items-center space-x-3">
                   <span
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                      order.paymentStatus === 'PAID'
+                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                        : 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+                    }`}
+                  >
+                    {order.paymentStatus === 'PAID' ? 'PAID' : (order.paymentType === 'PREPAID' ? 'UNPAID' : 'COD')}
+                  </span>
+                  <span
                     className={`text-xs font-bold px-3 py-1 rounded-full border ${
                       order.status === 'DELIVERED'
                         ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'

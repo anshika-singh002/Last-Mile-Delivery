@@ -1,9 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { orderService } from '../../services/orderService';
+import { paymentService } from '../../services/paymentService';
 import { socketService } from '../../services/socketService';
+import { useNotification } from '../../context/NotificationContext';
+import { useAuth } from '../../context/AuthContext';
+import { useCurrency } from '../../context/CurrencyContext';
 import LoadingSpinner from '../Common/LoadingSpinner';
 import TrackingMap from './TrackingMap';
 import RescheduleModal from './RescheduleModal';
+import RazorpayModal from '../Common/RazorpayModal';
 import {
   Package,
   Clock,
@@ -15,7 +20,8 @@ import {
   User,
   ShieldCheck,
   ShieldAlert,
-  RefreshCw
+  RefreshCw,
+  CreditCard
 } from 'lucide-react';
 
 const ORDER_LIFECYCLE_STEPS = [
@@ -28,9 +34,14 @@ const ORDER_LIFECYCLE_STEPS = [
 ];
 
 export default function OrderTracking({ orderId, onBack }) {
+  const { user } = useAuth();
+  const { addToast } = useNotification();
+  const { formatPrice } = useCurrency();
   const [order, setOrder] = useState(null);
   const [timelineData, setTimelineData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [paying, setPaying] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [agentLocation, setAgentLocation] = useState(null);
   const [showReschedule, setShowReschedule] = useState(false);
   const [verifyingLedger, setVerifyingLedger] = useState(false);
@@ -52,6 +63,54 @@ export default function OrderTracking({ orderId, onBack }) {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handlePayNow = async () => {
+    if (!order) return;
+    setPaying(true);
+    try {
+      const config = await paymentService.getPaymentConfig().catch(() => null);
+      const hasLiveKey = config?.data?.keyId && !config.data.keyId.includes('demo') && typeof window.Razorpay !== 'undefined';
+
+      if (hasLiveKey) {
+        await paymentService.openRazorpayModal({
+          deliveryOrderId: order.id,
+          amount: order.totalCharge,
+          customerName: user?.name || order.customerName,
+          customerEmail: user?.email || '',
+          customerPhone: user?.phone || '',
+          onSuccess: (paymentData) => {
+            addToast(`Payment successful! Receipt: ${paymentData.razorpayPaymentId}`, 'success');
+            fetchOrderDetails();
+          },
+          onFailure: (err) => {
+            addToast(`Payment cancelled or failed: ${err.message || 'Please try again'}`, 'error');
+          },
+          onDismiss: () => {
+            addToast('Payment checkout dismissed', 'info');
+          }
+        });
+      } else {
+        setShowPaymentModal(true);
+      }
+    } catch (err) {
+      addToast(err.message || 'Failed to initialize payment', 'error');
+    } finally {
+      setPaying(false);
+    }
+  };
+
+  const handleModalPaymentSuccess = async (paymentData) => {
+    try {
+      const verifyRes = await paymentService.verifyPayment(paymentData);
+      if (verifyRes.success) {
+        addToast(`Payment confirmed! Receipt: ${paymentData.razorpay_payment_id}`, 'success');
+        setShowPaymentModal(false);
+        fetchOrderDetails();
+      }
+    } catch (err) {
+      addToast(err.response?.data?.message || 'Failed to confirm payment', 'error');
     }
   };
 
@@ -108,23 +167,45 @@ export default function OrderTracking({ orderId, onBack }) {
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-4">
           <div>
-            <div className="flex items-center space-x-3">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               <h2 className="text-xl font-bold text-white">Order #{order.id}</h2>
               <span className={`text-xs font-bold px-3 py-1 rounded-full border ${getStatusColor(order.status)}`}>
                 {order.status}
+              </span>
+              <span
+                className={`text-xs font-bold px-3 py-1 rounded-full border ${
+                  order.paymentStatus === 'PAID'
+                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                    : 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+                }`}
+              >
+                {order.paymentStatus === 'PAID' ? 'PAID ONLINE (Razorpay)' : `${order.paymentType || 'COD'} - PENDING`}
               </span>
             </div>
             <p className="text-xs text-slate-400 mt-1">Placed on {new Date(order.createdAt).toLocaleString()}</p>
           </div>
 
-          {order.status === 'FAILED' && (
-            <button
-              onClick={() => setShowReschedule(true)}
-              className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-4 py-2 rounded-xl text-sm transition shadow-lg shadow-amber-500/20"
-            >
-              Reschedule Delivery Attempt
-            </button>
-          )}
+          <div className="flex items-center gap-3">
+            {order.paymentStatus !== 'PAID' && (
+              <button
+                onClick={handlePayNow}
+                disabled={paying}
+                className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold px-4 py-2 rounded-xl text-xs sm:text-sm transition shadow-lg shadow-emerald-500/20 flex items-center space-x-2"
+              >
+                <CreditCard className="w-4 h-4" />
+                <span>{paying ? 'Opening...' : `Pay ${formatPrice(order.totalCharge)} via Razorpay`}</span>
+              </button>
+            )}
+
+            {order.status === 'FAILED' && (
+              <button
+                onClick={() => setShowReschedule(true)}
+                className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-4 py-2 rounded-xl text-sm transition shadow-lg shadow-amber-500/20"
+              >
+                Reschedule Delivery Attempt
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Failed Delivery Action Banner */}
@@ -233,7 +314,7 @@ export default function OrderTracking({ orderId, onBack }) {
         />
 
         {/* Info Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
           <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-1">
             <span className="text-slate-400 font-semibold block uppercase">Pickup Location</span>
             <p className="text-white font-medium">{order.pickupAddress}</p>
@@ -244,6 +325,14 @@ export default function OrderTracking({ orderId, onBack }) {
             <span className="text-slate-400 font-semibold block uppercase">Drop Location</span>
             <p className="text-white font-medium">{order.dropAddress}</p>
             <span className="text-slate-500 block">Pincode: {order.dropPincode}</span>
+          </div>
+
+          <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-1">
+            <span className="text-slate-400 font-semibold block uppercase">Payment Summary</span>
+            <p className="text-white font-medium">{formatPrice(order.totalCharge)} ({order.paymentType})</p>
+            <span className={order.paymentStatus === 'PAID' ? 'text-emerald-400 font-semibold block truncate' : 'text-amber-400 font-semibold block'}>
+              {order.paymentStatus === 'PAID' ? `ID: ${order.razorpayPaymentId || 'Verified'}` : 'Payment Pending'}
+            </span>
           </div>
 
           <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-1">
@@ -331,6 +420,19 @@ export default function OrderTracking({ orderId, onBack }) {
           orderId={order.id}
           onClose={() => setShowReschedule(false)}
           onSuccess={() => fetchOrderDetails()}
+        />
+      )}
+
+      {showPaymentModal && (
+        <RazorpayModal
+          isOpen={showPaymentModal}
+          orderDetails={{
+            deliveryOrderId: order.id,
+            amount: order.totalCharge
+          }}
+          onSuccess={handleModalPaymentSuccess}
+          onFailure={(err) => addToast(`Payment failed: ${err.message}`, 'error')}
+          onClose={() => setShowPaymentModal(false)}
         />
       )}
     </div>
